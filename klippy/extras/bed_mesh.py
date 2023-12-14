@@ -173,7 +173,7 @@ class BedMesh:
     def get_z_factor(self, z_pos):
         z_pos += self.tool_offset
         if z_pos >= self.fade_end:
-            return 0.0
+            return 0.
         elif z_pos >= self.fade_start:
             return (self.fade_end - z_pos) / self.fade_dist
         else:
@@ -1354,15 +1354,6 @@ class ZMesh:
                            (self.mesh_x_count - 1)
         self.mesh_y_dist = (self.mesh_y_max - self.mesh_y_min) / \
                            (self.mesh_y_count - 1)
-        self.gcode = self.printer.lookup_object('gcode')
-        if "BED_MESH_SET_DISABLE" not in self.gcode.ready_gcode_handlers:
-            self.gcode.register_command(
-                'BED_MESH_SET_DISABLE', self.cmd_BED_MESH_SET_DISABLE,
-                desc=self.cmd_BED_MESH_SET_DISABLE_helper)
-        if "BED_MESH_SET_ENABLE" not in self.gcode.ready_gcode_handlers:
-            self.gcode.register_command(
-                'BED_MESH_SET_ENABLE', self.cmd_BED_MESH_SET_ENABLE,
-                desc=self.cmd_BED_MESH_SET_ENABLE_helper)
     def get_mesh_matrix(self):
         if self.mesh_matrix is not None:
             return [[round(z, 6) for z in line]
@@ -1430,25 +1421,17 @@ class ZMesh:
         return self.mesh_x_min + self.mesh_x_dist * index
     def get_y_coordinate(self, index):
         return self.mesh_y_min + self.mesh_y_dist * index
-    def cmd_BED_MESH_SET_DISABLE(self, gcmd):
-        self.isenable = False
-    cmd_BED_MESH_SET_DISABLE_helper = " set  MESH disable"
-    def cmd_BED_MESH_SET_ENABLE(self, gcmd):
-        self.isenable = True
-    cmd_BED_MESH_SET_ENABLE_helper = "set  MESH enable "
     def calc_z(self, x, y):
-        if self.isenable:
-            if self.mesh_matrix is not None:
-                tbl = self.mesh_matrix
-                tx, xidx = self._get_linear_index(x + self.mesh_offsets[0], 0)
-                ty, yidx = self._get_linear_index(y + self.mesh_offsets[1], 1)
-                z0 = lerp(tx, tbl[yidx][xidx], tbl[yidx][xidx+1])
-                z1 = lerp(tx, tbl[yidx+1][xidx], tbl[yidx+1][xidx+1])
-                return lerp(ty, z0, z1)
-            else:
-                pass
-                # No mesh table generated, no z-adjustment
-        return 0.
+        if self.mesh_matrix is not None:
+            tbl = self.mesh_matrix
+            tx, xidx = self._get_linear_index(x + self.mesh_offsets[0], 0)
+            ty, yidx = self._get_linear_index(y + self.mesh_offsets[1], 1)
+            z0 = lerp(tx, tbl[yidx][xidx], tbl[yidx][xidx+1])
+            z1 = lerp(tx, tbl[yidx+1][xidx], tbl[yidx+1][xidx+1])
+            return lerp(ty, z0, z1)
+        else:
+            # No mesh table generated, no z-adjustment
+            return 0.
     def get_z_range(self):
         if self.mesh_matrix is not None:
             mesh_min = min([min(x) for x in self.mesh_matrix])
