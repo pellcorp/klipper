@@ -209,7 +209,7 @@ class ChipClockUpdater:
         self.last_sequence = self.max_query_duration = 0
         self.last_overflows = 0
         self.mcu = self.oid = self.query_status_cmd = None
-    def setup_query_command(self, mcu, msgformat, oid, cq):
+    def setup_query_command(self, mcu, msgformat, oid, cq=None):
         self.mcu = mcu
         self.oid = oid
         self.query_status_cmd = self.mcu.lookup_query_command(
