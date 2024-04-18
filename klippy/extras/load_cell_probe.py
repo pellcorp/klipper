@@ -10,15 +10,21 @@ from . import probe, load_cell, hx71x, ads1220
 
 ######## Types
 
+
 class BadTapModule(object):
+
     def is_bad_tap(self, tap_analysis):
         return False
 
+
 class NozzleCleanerModule(object):
+
     def clean_nozzle(self):
         pass
 
+
 class TrapezoidalMove(object):
+
     def __init__(self, move):
         # copy c data to python memory
         self.print_time = float(move.print_time)
@@ -33,20 +39,23 @@ class TrapezoidalMove(object):
         self.z_r = float(move.z_r)
 
     def to_dict(self):
-        return {'print_time': float(self.print_time),
-                'move_t': float(self.move_t),
-                'start_v': float(self.start_v),
-                'accel': float(self.accel),
-                'start_x': float(self.start_x),
-                'start_y': float(self.start_y),
-                'start_z': float(self.start_z),
-                'x_r': float(self.x_r),
-                'y_r': float(self.y_r),
-                'z_r': float(self.z_r)
+        return {
+            'print_time': float(self.print_time),
+            'move_t': float(self.move_t),
+            'start_v': float(self.start_v),
+            'accel': float(self.accel),
+            'start_x': float(self.start_x),
+            'start_y': float(self.start_y),
+            'start_z': float(self.start_z),
+            'x_r': float(self.x_r),
+            'y_r': float(self.y_r),
+            'z_r': float(self.z_r)
         }
+
 
 # point on a time/force graph
 class ForcePoint(object):
+
     def __init__(self, time, force):
         self.time = time
         self.force = force
@@ -56,6 +65,7 @@ class ForcePoint(object):
 
 # slope/intercept based line where x is time and y is force
 class ForceLine(object):
+
     def __init__(self, slope, intercept):
         self.slope = slope
         self.intercept = intercept
@@ -83,16 +93,26 @@ class ForceLine(object):
     def to_dict(self):
         return {'slope': self.slope, 'intercept': self.intercept}
 
+
 # convert double to signed fixed point Q12.19 integer
 Q12_INT_BITS = 12
 Q12_FRAC_BITS = (32 - (1 + Q12_INT_BITS))
+
+
 def as_fixedQ12(val):
-    return int(val * (2 ** Q12_FRAC_BITS))
+    return int(val * (2**Q12_FRAC_BITS))
+
 
 # Digital filter designer and container
 class DigialFilter:
-    def __init__(self, sps, cfg_error, highpass=None, lowpass=None,
-                    notches=None, notch_quality=2.0):
+
+    def __init__(self,
+                 sps,
+                 cfg_error,
+                 highpass=None,
+                 lowpass=None,
+                 notches=None,
+                 notch_quality=2.0):
         self.filter_sections = None
         self.sample_frequency = sps
         if not (highpass or lowpass or notches):
@@ -145,8 +165,10 @@ class DigialFilter:
     def has_filters(self):
         return self.filter_sections is not None
 
+
 #########################
 # Math Support Functions
+
 
 # compute the index in the time array when some value was surpassed
 def index_near(time, instant):
@@ -270,6 +292,7 @@ class ForceGraph:
         p5 = ForcePoint(self.time[-1], l5.find_force(self.time[-1]))
         return [p0, p1, p2, p3, p4, p5], [l1, l2, l3, l4, l5]
 
+
 # calculate variance between a ForceLine and a region of force data
 def segment_variance(force, time, start, end, line):
     import numpy as np
@@ -283,24 +306,32 @@ def segment_variance(force, time, start, end, line):
         delta_var += pow(line.find_force(instant) - load, 2)
     return total_var, delta_var
 
+
 # decide how well the ForceLines predict force near an elbow
 # bad predictions == blunt elbow, good predictions == sharp elbow
 def elbow_r_squared(force, time, elbow_idx, widths, left_line, right_line):
     r_squared = []
     for width in widths:
-        l_tv, l_dv = segment_variance(force, time,
-                                elbow_idx - width, elbow_idx, left_line)
-        r_tv, r_dv = segment_variance(force, time,
-                                elbow_idx, elbow_idx + width, right_line)
+        l_tv, l_dv = segment_variance(force, time, elbow_idx - width,
+                                      elbow_idx, left_line)
+        r_tv, r_dv = segment_variance(force, time, elbow_idx,
+                                      elbow_idx + width, right_line)
         r2 = 1 - ((l_dv + r_dv) / (l_tv + r_tv))
         # returns r squared as a percentage. -350% is bad. 80% is good!
         r_squared.append(round((r2 * 100.), 1))
     return r_squared
 
+
 # TODO: maybe discard points can scale with sample rate from 1 to 3
 DEFAULT_DISCARD_POINTS = 3
+
+
 class TapAnalysis(object):
-    def __init__(self, printer, samples, tap_filter,
+
+    def __init__(self,
+                 printer,
+                 samples,
+                 tap_filter,
                  discard=DEFAULT_DISCARD_POINTS):
         import numpy as np
         self.printer = printer
@@ -310,14 +341,15 @@ class TapAnalysis(object):
         self.force = tap_filter.filtfilt(np_samples[:, 1])
         self.force_graph = ForceGraph(self.time, self.force)
         self.sample_time = np.average(np.diff(self.time))
-        self.r_squared_widths = [int((n * 0.01) // self.sample_time)
-                                 for n in range(2, 7)]
+        self.r_squared_widths = [
+            int((n * 0.01) // self.sample_time) for n in range(2, 7)
+        ]
         trapq = printer.lookup_object('motion_report').trapqs['toolhead']
         self.moves = self._extract_trapq(trapq)
         self.home_end_time = self._recalculate_homing_end()
         self.pullback_start_time = self.moves[-3].print_time
-        self.pullback_end_time = (self.moves[-1].print_time
-                                  + self.moves[-1].move_t)
+        self.pullback_end_time = (self.moves[-1].print_time +
+                                  self.moves[-1].move_t)
         self.position = self._extract_pos_history()
         self.is_valid = False
         self.tap_pos = None
@@ -345,10 +377,9 @@ class TapAnalysis(object):
             if start_time <= print_time < end_time:
                 # we have found the move
                 move_t = move.move_t
-                move_time = max(0.,
-                        min(move_t, print_time - move.print_time))
-                dist = ((move.start_v + .5 * move.accel * move_time)
-                        * move_time)
+                move_time = max(0., min(move_t, print_time - move.print_time))
+                dist = ((move.start_v + .5 * move.accel * move_time) *
+                        move_time)
                 pos = ((move.start_x + move.x_r * dist,
                         move.start_y + move.y_r * dist,
                         move.start_z + move.z_r * dist))
@@ -366,10 +397,10 @@ class TapAnalysis(object):
         # acceleration should be 0! This is the 'coasting' move:
         if homing_move.accel != 0.:
             raise self.printer.command_error(
-                    'Unexpected acceleration in coasting move')
+                'Unexpected acceleration in coasting move')
         # how long did it take to get to end_z?
-        homing_move.move_t = abs((halt_move.start_z - homing_move.start_z)
-                                 / homing_move.start_v)
+        homing_move.move_t = abs(
+            (halt_move.start_z - homing_move.start_z) / homing_move.start_v)
         return homing_move.print_time + homing_move.move_t
 
     def _extract_trapq(self, trapq):
@@ -382,7 +413,7 @@ class TapAnalysis(object):
         num_moves = len(moves_out)
         if num_moves < 5 or num_moves > 6:
             raise self.printer.command_error(
-                "Expected tap to be 5 to 6 moves long was %s" % (num_moves,))
+                "Expected tap to be 5 to 6 moves long was %s" % (num_moves, ))
         return moves_out
 
     def analyze(self):
@@ -783,12 +814,18 @@ class LoadCellEndstop:
 
         # Static triggering
         self.trigger_force_grams = config.getfloat('trigger_force',
-                                    minval=10., maxval=250., default=75.)
+                                                   minval=10.,
+                                                   maxval=250.,
+                                                   default=75.)
         self.safety_limit_grams = config.getfloat('safety_limit',
-                                    minval=100., maxval=5000., default=2000.)
+                                                  minval=100.,
+                                                  maxval=5000.,
+                                                  default=2000.)
         #TODO: Review: In my view, this should always be 1
         self.trigger_count = config.getint("trigger_count",
-                                           default=1, minval=1, maxval=5)
+                                           default=1,
+                                           minval=1,
+                                           maxval=5)
         # optional continuous tearing
         sps = self._load_cell.get_sensor().get_samples_per_second()
         # Collect 4x60hz power cycles of data to average across power noise
@@ -798,30 +835,42 @@ class LoadCellEndstop:
                                             minval=2, maxval=sps)
         max_filter_frequency = math.floor(sps / 2.)
         hp_option = "continuous_tare_highpass"
-        highpass = config.getfloat(hp_option, minval=0.1,
-                                   below=max_filter_frequency, default=None)
+        highpass = config.getfloat(hp_option,
+                                   minval=0.1,
+                                   below=max_filter_frequency,
+                                   default=None)
         lowpass = config.getfloat("continuous_tare_lowpass",
-                above=highpass or 0., below=max_filter_frequency, default=None)
-        notches = getfloatlist(config, "continuous_tare_notch", max_len=2,
-                above=(highpass or 0.), below=(lowpass or max_filter_frequency))
+                                  above=highpass or 0.,
+                                  below=max_filter_frequency,
+                                  default=None)
+        notches = getfloatlist(config,
+                               "continuous_tare_notch",
+                               max_len=2,
+                               above=(highpass or 0.),
+                               below=(lowpass or max_filter_frequency))
         notch_quality = config.getfloat("continuous_tare_notch_quality",
-                                        minval=0.5, maxval=6.0, default=2.0)
+                                        minval=0.5,
+                                        maxval=6.0,
+                                        default=2.0)
         self.continuous_trigger_force = config.getfloat(
             'continuous_tare_trigger_force',
-            minval=1., maxval=250., default=40.)
+            minval=1.,
+            maxval=250.,
+            default=40.)
         if (lowpass or notches) and highpass is None:
             raise config.error("Option %s is section %s must be set to use"
                     " continuous tare" % (hp_option, config.get_name(),))
 
-        self._continuous_tare_filter = DigialFilter(sps, config.error, highpass,
-                                                lowpass, notches, notch_quality)
+        self._continuous_tare_filter = DigialFilter(sps, config.error,
+                                                    highpass, lowpass, notches,
+                                                    notch_quality)
         # activate/deactivate gcode
         gcode_macro = printer.load_object(config, 'gcode_macro')
         self.position_endstop = config.getfloat('z_offset')
-        self.activate_gcode = gcode_macro.load_template(config,
-                                                        'activate_gcode', '')
-        self.deactivate_gcode = gcode_macro.load_template(config,
-                                                        'deactivate_gcode', '')
+        self.activate_gcode = gcode_macro.load_template(
+            config, 'activate_gcode', '')
+        self.deactivate_gcode = gcode_macro.load_template(
+            config, 'deactivate_gcode', '')
         # multi probes state
         self.multi = 'OFF'
         self.deactivate_on_each_sample = config.getboolean(
@@ -893,7 +942,7 @@ class LoadCellEndstop:
 
     def _handle_load_cell_tare(self, lc):
         if lc is self._load_cell:
-            logging.info("load cell tare event: %s" % (lc.get_tare_counts(),))
+            logging.info("load cell tare event: %s" % (lc.get_tare_counts(), ))
             self.set_endstop_range(lc.get_tare_counts())
 
     def set_endstop_range(self, tare_counts):
@@ -914,19 +963,22 @@ class LoadCellEndstop:
         # the filter is restricted to no more than +/- 2^Q_12 - 1 grams (2048)
         # this cant be changed without also changing from q12 format in MCU
         safe_bits = (Q12_INT_BITS - 1)
-        filter_margin = math.floor(counts_per_gram * (2 ** safe_bits))
+        filter_margin = math.floor(counts_per_gram * (2**safe_bits))
         filter_min = max(tare_counts - filter_margin, safety_min)
         filter_max = min(tare_counts + filter_margin, safety_max)
         # truncate extra bits for sensors with a large counts_per_gram
         storage_bits = int(math.ceil(math.log(counts_per_gram, 2)))
         rounding_shift = int(max(0, storage_bits - safe_bits))
         # grams per count, in rounded units
-        grams_per_count = 1. / (counts_per_gram / (2 ** rounding_shift))
-        logging.info("Set endstop range: %s, %s, %s" % (trigger_min, trigger_max, tare_counts))
-        args = [self._oid, safety_min, safety_max, filter_min, filter_max,
-                trigger_min, trigger_max, tare_counts,
-                as_fixedQ12(self.continuous_trigger_force),
-                rounding_shift, as_fixedQ12(grams_per_count)]
+        grams_per_count = 1. / (counts_per_gram / (2**rounding_shift))
+        logging.info("Set endstop range: %s, %s, %s" %
+                     (trigger_min, trigger_max, tare_counts))
+        args = [
+            self._oid, safety_min, safety_max, filter_min, filter_max,
+            trigger_min, trigger_max, tare_counts,
+            as_fixedQ12(self.continuous_trigger_force), rounding_shift,
+            as_fixedQ12(grams_per_count)
+        ]
 
         self._set_range_cmd.send(args)
 
