@@ -1,4 +1,4 @@
-CC = mips-linux-gnu-gcc
+CC = mipsel-buildroot-linux-gnu-gcc
 CFLAGS := -Wall -g -O2 -fPIC -flto -fwhole-program -fno-use-linker-plugin
 
 OBJECTS = pyhelper.o serialqueue.o stepcompress.o itersolve.o trapq.o \
