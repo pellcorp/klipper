@@ -378,18 +378,23 @@ class TapAnalysis(object):
 
     # adjust move_t of move 1 to match the toolhead position of move 2
     def _recalculate_homing_end(self):
-        #TODO: REVIEW: This takes some logical shortcuts, does it need to be
-        # more generalized? e.g. to all 3 axes?
-        homing_move = self.moves[-5]
-        halt_move = self.moves[-4]
         # acceleration should be 0! This is the 'coasting' move:
-        accel = homing_move.accel
-        if accel != 0.:
-            raise self.printer.command_error(
-                'Unexpected acceleration in coasting move')
+        homing_moves = [move for move in self.moves if (move.z_r == -1.0) & (move.accel == 0.0)]
+        num_homing_moves = len(homing_moves)
+        if num_homing_moves != 1:
+            raise self.printer.command_error("Expected to be only one 'coasting' move down in tap. Got %s" % (num_homing_moves, ))
+        homing_move = homing_moves[0]
+        if homing_move.start_v == 0.0:
+            raise self.printer.command_error("Homing move start_v = 0.0")
+
+        halt_moves = [move for move in self.moves if move.move_t == 0.0]
+        num_halt_moves = len(halt_moves)
+        if num_halt_moves != 1:
+            raise self.printer.command_error("Expected to be only one halt move in tap. Got %s" % (num_halt_moves, ))
+        halt_move = halt_moves[0]
+
         # how long did it take to get to end_z?
-        homing_move.move_t = abs(
-            (halt_move.start_z - homing_move.start_z) / homing_move.start_v)
+        homing_move.move_t = abs((halt_move.start_z - homing_move.start_z) / homing_move.start_v)
         return homing_move.print_time + homing_move.move_t
 
     def _extract_trapq(self, trapq):
@@ -400,9 +405,9 @@ class TapAnalysis(object):
             # DEBUG: enable to see trapq contents
             # logging.info("trapq move: %s" % (moves_out[-1].to_dict(),))
         num_moves = len(moves_out)
-        if num_moves < 5 or num_moves > 6:
+        if num_moves < 5 or num_moves > 7:
             raise self.printer.command_error(
-                "Expected tap to be 5 to 6 moves long was %s" % (num_moves, ))
+                "Expected tap to be 5 to 7 moves long was %s" % (num_moves, ))
         return moves_out
 
     def analyze(self):
