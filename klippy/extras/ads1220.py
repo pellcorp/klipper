@@ -66,7 +66,7 @@ class ADS1220:
         # check for conflict between REF1 and AIN0/AIN3
         mux_conflict = [0b0000, 0b0001, 0b0010, 0b0100, 0b0101, 0b0110, 0b0111,
                         0b1000, 0b1011]
-        if self.vref == 0b11 and self.mux in mux_conflict:
+        if self.vref == 0b10 and self.mux in mux_conflict:
             raise config.error("ADS1220 config error: AIN0/REFP1 and AIN3/REFN1"
                                " cant be used as a voltage reference and"
                                " an input at the same time")
