@@ -390,6 +390,10 @@ class TapAnalysis(object):
 
     # adjust move_t of move 1 to match the toolhead position of move 2
     def _recalculate_homing_end(self):
+        #TODO: REVIEW: This takes some logical shortcuts, does it need to be
+        # more generalized? e.g. to all 3 axes?
+        homing_move = self.moves[-5]
+        halt_move = self.moves[-4]
         # acceleration should be 0! This is the 'coasting' move:
         if homing_move.accel != 0.:
             raise self.printer.command_error(
