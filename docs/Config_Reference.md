@@ -998,6 +998,13 @@ Visual Examples:
 #adaptive_margin:
 #   An optional margin (in mm) to be added around the bed area used by
 #   the defined print objects when generating an adaptive mesh.
+#scan_overshoot:
+#  The maximum amount of travel (in mm) available outside of the mesh.
+#  For rectangular beds this applies to travel on the X axis, and for round beds
+#  it applies to the entire radius.  The tool must be able to travel the amount
+#  specified outside of the mesh.  This value is used to optimize the travel
+#  path when performing a "rapid scan".  The minimum value that may be specified
+#  is 1.  The default is no overshoot.
 ```
 
 ### [bed_tilt]
@@ -1233,7 +1240,9 @@ the nature of skew correction these lengths are set via gcode. See
 Temperature-dependant toolhead Z position adjustment. Compensate for vertical
 toolhead movement caused by thermal expansion of the printer's frame in
 real-time using a temperature sensor (typically coupled to a vertical section
-of frame).
+of frame). Multiple sections may be defined as [z_thermal_adjust component] to
+compensate for thermal expansion in different printer components, such as the
+hotend, heatbreak and frame.
 
 See also: [extended g-code commands](G-Codes.md#z_thermal_adjust).
 
@@ -1255,6 +1264,10 @@ See also: [extended g-code commands](G-Codes.md#z_thermal_adjust).
 #max_z_adjustment:
 #   Maximum absolute adjustment that can be applied to the Z axis [mm]. The
 #   default is 99999999.0 mm (unlimited).
+#sensor:
+#   Name of a single temperature sensor to use as a temperature source. E.g.
+#   'temperature_sensor frame', 'extruder', 'heater_bed' etc. If this option
+#   is used the other sensor options are not used. 
 #sensor_type:
 #sensor_pin:
 #min_temp:
@@ -1472,7 +1485,8 @@ path:
 #   be provided.
 #on_error_gcode:
 #   A list of G-Code commands to execute when an error is reported.
-
+#   See docs/Command_Templates.md for G-Code format. The default is to
+#   run TURN_OFF_HEATERS.
 ```
 
 ### [sdcard_loop]
@@ -1995,6 +2009,43 @@ z_offset:
 #   See the "probe" section for more information on the parameters above.
 ```
 
+### [probe_eddy_current]
+
+Support for eddy current inductive probes. One may define this section
+(instead of a probe section) to enable this probe. See the
+[command reference](G-Codes.md#probe_eddy_current) for further information.
+
+```
+[probe_eddy_current my_eddy_probe]
+sensor_type: ldc1612
+#   The sensor chip used to perform eddy current measurements. This
+#   parameter must be provided and must be set to ldc1612.
+#intb_pin:
+#   MCU gpio pin connected to the ldc1612 sensor's INTB pin (if
+#   available). The default is to not use the INTB pin.
+#z_offset:
+#   The nominal distance (in mm) between the nozzle and bed that a
+#   probing attempt should stop at. This parameter must be provided.
+#i2c_address:
+#i2c_mcu:
+#i2c_bus:
+#i2c_software_scl_pin:
+#i2c_software_sda_pin:
+#i2c_speed:
+#   The i2c settings for the sensor chip. See the "common I2C
+#   settings" section for a description of the above parameters.
+#x_offset:
+#y_offset:
+#speed:
+#lift_speed:
+#samples:
+#sample_retract_dist:
+#samples_result:
+#samples_tolerance:
+#samples_tolerance_retries:
+#   See the "probe" section for information on these parameters.
+```
+
 ### [axis_twist_compensation]
 
 A tool to compensate for inaccurate probe readings due to twist in X gantry. See
@@ -2356,6 +2407,69 @@ temperature sensors that are reported via the M105 command.
 #   parameter.
 ```
 
+### [temperature_probe]
+
+Reports probe coil temperature.  Includes optional thermal drift
+calibration for eddy current based probes.   A `[temperature_probe]`
+section may be linked to a `[probe_eddy_current]` by using the same
+postfix for both sections.
+
+```
+[temperature_probe my_probe]
+#sensor_type:
+#sensor_pin:
+#min_temp:
+#max_temp:
+#   Temperature sensor configuration.
+#   See the "extruder" section for the definition of the above
+#   parameters.
+#smooth_time:
+#   A time value (in seconds) over which temperature measurements will
+#   be smoothed to reduce the impact of measurement noise. The default
+#   is 2.0 seconds.
+#gcode_id:
+#   See the "heater_generic" section for the definition of this
+#   parameter.
+#speed:
+#   The travel speed [mm/s] for xy moves during calibration.  Default
+#   is the speed defined by the probe.
+#horizontal_move_z:
+#   The z distance [mm] from the bed at which xy moves will occur
+#   during calibration. Default is 2mm.
+#resting_z:
+#   The z distance [mm] from the bed at which the tool will rest
+#   to heat the probe coil during calibration.  Default is .4mm
+#calibration_position:
+#   The X, Y, Z position where the tool should be moved when
+#   probe drift calibration initializes.  This is the location
+#   where the first manual probe will occur.  If omitted, the
+#   default behavior is not to move the tool prior to the first
+#   manual probe.
+#calibration_bed_temp:
+#   The maximum safe bed temperature (in C) used to heat the probe
+#   during probe drift calibration.  When set, the calibration
+#   procedure will turn on the bed after the first sample is
+#   taken.  When the calibration procedure is complete the bed
+#   temperature will be set to zero.  When omitted the default
+#   behavior is not to set the bed temperature.
+#calibration_extruder_temp:
+#   The extruder temperature (in C) set probe during drift calibration.
+#   When this option is supplied the procedure will wait for until the
+#   specified temperature is reached before requesting the first manual
+#   probe.  When the calibration procedure is complete the extruder
+#   temperature will be set to 0.  When omitted the default behavior is
+#   not to set the extruder temperature.
+#extruder_heating_z: 50.
+#   The Z location where extruder heating will occur if the
+#   "calibration_extruder_temp" option is set.  Its recommended to heat
+#   the extruder some distance from the bed to minimize its impact on
+#   the probe coil temperature.  The default is 50.
+#max_validation_temp: 60.
+#   The maximum temperature used to validate the calibration.  It is
+#   recommended to set this to a value between 100 and 120 for enclosed
+#   printers.  The default is 60.
+```
+
 ## Temperature sensors
 
 Klipper includes definitions for many types of temperature sensors.
@@ -2455,9 +2569,9 @@ sensor_pin:
 #   name in the above list.
 ```
 
-### BMP180/BMP280/BME280/BME680 temperature sensor
+### BMP180/BMP280/BME280/BMP388/BME680 temperature sensor
 
-BMP180/BMP280/BME280/BME680 two wire interface (I2C) environmental sensors.
+BMP180/BMP280/BME280/BMP388/BME680 two wire interface (I2C) environmental sensors.
 Note that these sensors are not intended for use with extruders and
 heater beds, but rather for monitoring ambient temperature (C),
 pressure (hPa), relative humidity and in case of the BME680 gas level.
@@ -2468,8 +2582,8 @@ temperature.
 ```
 sensor_type: BME280
 #i2c_address:
-#   Default is 118 (0x76). The BMP180 and some BME280 sensors have an address of 119
-#   (0x77).
+#   Default is 118 (0x76). The BMP180, BMP388 and some BME280 sensors
+#   have an address of 119 (0x77).
 #i2c_mcu:
 #i2c_bus:
 #i2c_software_scl_pin:
@@ -2538,6 +2652,25 @@ sensor_type:
 #   Default is: "TEMP11_HUM11"
 #htu21d_report_time:
 #   Interval in seconds between readings. Default is 30
+```
+
+### SHT3X sensor
+
+SHT3X family two wire interface (I2C) environmental sensor. These sensors
+have a range of -55~125 C, so are usable for e.g. chamber temperature
+monitoring. They can also function as simple fan/heater controllers.
+
+```
+sensor_type: SHT3X
+#i2c_address:
+#   Default is 68 (0x44).
+#i2c_mcu:
+#i2c_bus:
+#i2c_software_scl_pin:
+#i2c_software_sda_pin:
+#i2c_speed:
+#   See the "common I2C settings" section for a description of the
+#   above parameters.
 ```
 
 ### LM75 temperature sensor
@@ -3263,6 +3396,18 @@ run_current:
 #   set, "stealthChop" mode will be enabled if the stepper motor
 #   velocity is below this value. The default is 0, which disables
 #   "stealthChop" mode.
+#coolstep_threshold:
+#   The velocity (in mm/s) to set the TMC driver internal "CoolStep"
+#   threshold to. If set, the coolstep feature will be enabled when
+#   the stepper motor velocity is near or above this value. Important
+#   - if coolstep_threshold is set and "sensorless homing" is used,
+#   then one must ensure that the homing speed is above the coolstep
+#   threshold! The default is to not enable the coolstep feature.
+#high_velocity_threshold:
+#   The velocity (in mm/s) to set the TMC driver internal "high
+#   velocity" threshold (THIGH) to. This is typically used to disable
+#   the "CoolStep" feature at high speeds. The default is to not set a
+#   TMC "high velocity" threshold.
 #driver_MSLUT0: 2863314260
 #driver_MSLUT1: 1251300522
 #driver_MSLUT2: 608774441
@@ -3293,11 +3438,19 @@ run_current:
 #driver_TOFF: 4
 #driver_HEND: 7
 #driver_HSTRT: 0
+#driver_VHIGHFS: 0
+#driver_VHIGHCHM: 0
 #driver_PWM_AUTOSCALE: True
 #driver_PWM_FREQ: 1
 #driver_PWM_GRAD: 4
 #driver_PWM_AMPL: 128
 #driver_SGT: 0
+#driver_SEMIN: 0
+#driver_SEUP: 0
+#driver_SEMAX: 0
+#driver_SEDN: 0
+#driver_SEIMIN: 0
+#driver_SFILT: 0
 #   Set the given register during the configuration of the TMC2130
 #   chip. This may be used to set custom motor parameters. The
 #   defaults for each parameter are next to the parameter name in the
@@ -3394,6 +3547,13 @@ run_current:
 #sense_resistor: 0.110
 #stealthchop_threshold: 0
 #   See the "tmc2208" section for the definition of these parameters.
+#coolstep_threshold:
+#   The velocity (in mm/s) to set the TMC driver internal "CoolStep"
+#   threshold to. If set, the coolstep feature will be enabled when
+#   the stepper motor velocity is near or above this value. Important
+#   - if coolstep_threshold is set and "sensorless homing" is used,
+#   then one must ensure that the homing speed is above the coolstep
+#   threshold! The default is to not enable the coolstep feature.
 #uart_address:
 #   The address of the TMC2209 chip for UART messages (an integer
 #   between 0 and 3). This is typically used when multiple TMC2209
@@ -3413,6 +3573,11 @@ run_current:
 #driver_PWM_GRAD: 14
 #driver_PWM_OFS: 36
 #driver_SGTHRS: 0
+#driver_SEMIN: 0
+#driver_SEUP: 0
+#driver_SEMAX: 0
+#driver_SEDN: 0
+#driver_SEIMIN: 0
 #   Set the given register during the configuration of the TMC2209
 #   chip. This may be used to set custom motor parameters. The
 #   defaults for each parameter are next to the parameter name in the
@@ -3547,6 +3712,18 @@ run_current:
 #   set, "stealthChop" mode will be enabled if the stepper motor
 #   velocity is below this value. The default is 0, which disables
 #   "stealthChop" mode.
+#coolstep_threshold:
+#   The velocity (in mm/s) to set the TMC driver internal "CoolStep"
+#   threshold to. If set, the coolstep feature will be enabled when
+#   the stepper motor velocity is near or above this value. Important
+#   - if coolstep_threshold is set and "sensorless homing" is used,
+#   then one must ensure that the homing speed is above the coolstep
+#   threshold! The default is to not enable the coolstep feature.
+#high_velocity_threshold:
+#   The velocity (in mm/s) to set the TMC driver internal "high
+#   velocity" threshold (THIGH) to. This is typically used to disable
+#   the "CoolStep" feature at high speeds. The default is to not set a
+#   TMC "high velocity" threshold.
 #driver_MSLUT0: 2863314260
 #driver_MSLUT1: 1251300522
 #driver_MSLUT2: 608774441
@@ -3668,6 +3845,18 @@ run_current:
 #   set, "stealthChop" mode will be enabled if the stepper motor
 #   velocity is below this value. The default is 0, which disables
 #   "stealthChop" mode.
+#coolstep_threshold:
+#   The velocity (in mm/s) to set the TMC driver internal "CoolStep"
+#   threshold to. If set, the coolstep feature will be enabled when
+#   the stepper motor velocity is near or above this value. Important
+#   - if coolstep_threshold is set and "sensorless homing" is used,
+#   then one must ensure that the homing speed is above the coolstep
+#   threshold! The default is to not enable the coolstep feature.
+#high_velocity_threshold:
+#   The velocity (in mm/s) to set the TMC driver internal "high
+#   velocity" threshold (THIGH) to. This is typically used to disable
+#   the "CoolStep" feature at high speeds. The default is to not set a
+#   TMC "high velocity" threshold.
 #driver_MSLUT0: 2863314260
 #driver_MSLUT1: 1251300522
 #driver_MSLUT2: 608774441
@@ -4464,6 +4653,178 @@ adc2:
 #pause_delay:
 #   See the "filament_switch_sensor" section for a description of the
 #   above parameters.
+```
+
+## Load Cells
+
+### [load_cell]
+Load Cell. Uses an ADC sensor attached to a load cell to create a digital
+scale.
+
+```
+[load_cell]
+sensor_type:
+#   This must be one of the supported sensor types, see below.
+#counts_per_gram:
+#   The number of sensor counts that indicates 1 gram of force. This is
+#   calculated by the CALIBRATE_LOAD_CELL command.
+#reference_tare_counts:
+#   This is the tare value, in raw sensor counts, taken when CALIBRATE_LOAD_CELL
+#   is run. This is the default tare value when klipper starts up.
+```
+
+#### XH711
+This is a 24 bit low sample rate chip using "bit-bang" communications. It is
+suitable for filament scales.
+```
+[load_cell]
+sensor_type: hx711
+sclk_pin:
+#   The pin connected to the HX711 clock line. This parameter must be provided.
+dout_pin:
+#   The pin connected to the HX711 data output line. This parameter must be
+#   provided.
+#gain: A-128
+#   Valid values for gain are: A-128, A-64, B-32. The default is A-128.
+#   'A' denotes the input channel and the number denotes the gain. Only the 3
+#   listed combinations are supported by the chip. Note that changing the gain
+#   setting also selects the channel being read.
+#sample_rate: 80
+#   Valid values for sample_rate are 80 or 10. The default value is 80.
+#   This must match the wiring of the chip. The sample rate cannot be changed
+#   in software.
+```
+
+#### HX717
+This is the 4x higher sample rate version of the HX711, suitable for probing.
+```
+[load_cell]
+sensor_type: hx717
+sclk_pin:
+#   The pin connected to the HX717 clock line. This parameter must be provided.
+dout_pin:
+#   The pin connected to the HX717 data output line. This parameter must be
+#   provided.
+#gain: A-128
+#   Valid values for gain are A-128, B-64, A-64, B-8.
+#   'A' denotes the input channel and the number denotes the gain setting.
+#   Only the 4 listed combinations are supported by the chip. Note that
+#   changing the gain setting also selects the channel being read.
+#sample_rate: 320
+#   Valid values for sample_rate are: 10, 20, 80, 320. The default is 320.
+#   This must match the wiring of the chip. The sample rate cannot be changed
+#   in software.
+```
+
+#### ADS1220
+The ADS1220 is a 24 bit ADC supporting up to a 2Khz sample rate configurable in
+software.
+```
+[load_cell]
+sensor_type: ads1220
+cs_pin:
+#   The pin connected to the ADS1220 chip select line. This parameter must
+#   be provided.
+#spi_speed: 512000
+#   This chip supports 2 speeds: 256000 or 512000. The faster speed is only
+#   enabled when one of the Turbo sample rates is used. The correct spi_speed
+#   is selected based on the sample rate.
+#spi_bus:
+#spi_software_sclk_pin:
+#spi_software_mosi_pin:
+#spi_software_miso_pin:
+#   See the "common SPI settings" section for a description of the
+#   above parameters.
+data_ready_pin:
+#   Pin connected to the ADS1220 data ready line. This parameter must be
+#   provided.
+#gain: 128
+#   Valid gain values are 128, 64, 32, 16, 8, 4, 2, 1
+#   The default is 128
+#pga_bypass: False
+#   Disable the internal Programmable Gain Amplifier. If
+#   True the Gain settign has no effect. If AVSS is used as an input this is
+#   forced to True.
+#   The default is False.
+#sample_rate: 660
+#   This chip supports two ranges of sample rates, Normal and Turbo. In turbo
+#   mode the chip's internal clock runs twice as fast and the SPI communication
+#   speed is also doubled.
+#   Normal sample rates: 20, 45, 90, 175, 330, 600, 1000
+#   Turbo sample rates: 40, 90, 180, 350, 660, 1200, 2000
+#   The default is 660
+#input_mux:
+#   Input multiplexer configuration, select a pair of pins to use. The first pin
+#   is the positive, AINP, and the second pin is the negative, AINN. Valid 
+#   values are: 'AIN0_AIN1', 'AIN0_AIN2', 'AIN0_AIN3', 'AIN1_AIN2', 'AIN1_AIN3',
+#   'AIN2_AIN3', 'AIN1_AIN0', 'AIN3_AIN2', 'AIN0_AVSS', 'AIN1_AVSS', 'AIN2_AVSS'
+#   and 'AIN3_AVSS'. If AVSS is used the PGA is bypassed and the pga_bypass
+#   setting will be forced to True.
+#   The default is AIN0_AIN1.
+#vref:
+#   The selected voltage reference. Valid values are: 'internal', 'REF0', 'REF1'
+#   and 'analog_supply'. Default is 'internal'.  
+```
+
+### [load_cell_probe]
+Load Cell Probe. This combines the functionality of a [probe] and a [load_cell].
+
+```
+[load_cell_probe]
+sensor_type:
+#   This must be one of the supported bulk ADC sensor types and support
+#   load cell endstops on the mcu.
+#counts_per_gram:
+#reference_tare_counts:
+#   These parameters must be configured before the probe will operate.
+#   See the [load_cell] section for further details.
+#safety_limit: 1000
+#   The safe limit for probing force relative to the reference_tare_counts on
+#   the load_cell. The default is +/-1Kg.
+#trigger_force: 50.0
+#   The force that the probe will trigger at. 50g is the default.
+#continuous_tare_highpass: 0.8
+#   Enable optional continuous taring while homing & probing to reject drift.
+#   The value is a frequency, in Hz, below which drift will be ignored.This
+#   option requires the SciPy library. Default: None
+#continuous_tare_lowpass: 100.0
+#   The value is a frequency, in Hz, above which high frequency noise in the
+#   load cell will be igfiltered outnored. If this option is set,
+#   continuous_tare_highpass must also be set. Default: None
+#continuous_tare_notch: 50, 60
+#   1 or 2 frequencies, in Hz, to filter out of the load cell data. This is
+#   intended to reject power line noise. If this option is set,
+#   continuous_tare_highpass must also be set. Default: None
+#continuous_tare_notch_quality: 2.0
+#   Controls how narrow the range of frequencies are that the notch filter
+#   removes. Larger numbers produce a narrower filter. Minimum value is 0.5 and
+#   maximum is 3.0. Default: 2.0
+#continuous_tare_trigger_force_grams: 40.0
+#   The force that the probe will trigger at whe using the continuous tearing
+#   filter. 40g is the default.
+#trigger_count: 1
+#   The number of samples over the trigger_force_grams threshold that will cause
+#   the probe to trigger. 1 is the default.
+#settling_time: 0.375
+#   Additional time to wait before taring the probe in seconds. This allows any
+#   vibrations to settle and bowden tubes time to flex etc. This improves
+#   repeatability. If the continuous_tare_filter is used this may be set to 0.
+#tare_samples: 
+#   The number of samples to use when automatically taring the load_cell before
+#   each probe. The default value is: sample_per_second * (1 / 60) * 4. This
+#   collects samples from 4 cycles of 60Hz mains power to cancel power line
+#   noise.
+#z_offset:
+#speed:
+#samples:
+#sample_retract_dist:
+#lift_speed:
+#samples_result:
+#samples_tolerance:
+#samples_tolerance_retries:
+#activate_gcode:
+#deactivate_gcode:
+#   See the "[probe]" section for a description of the above parameters.
 ```
 
 ## Board specific hardware support

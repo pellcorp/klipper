@@ -282,6 +282,28 @@ The following information is available for each `[led led_name]`,
   chain could be accessed at
   `printer["neopixel <config_name>"].color_data[1][2]`.
 
+## load_cell
+
+The following information is available for each `[load_cell name]`:
+- 'is_calibrated': True/False is the load cell calibrated
+- 'counts_per_gram': The number of raw sensor counts that equals 1 gram of force
+- 'reference_tare_counts': The reference number of raw sensor counts for 0 force
+- 'tare_counts': The current number of raw sensor counts for 0 force
+- 'force_g': The force in grams, averaged over the last polling period.
+- 'min_force_g': The minimum force in grams, over the last polling period.
+- 'max_force_g': The maximum force in grams, over the last polling period.
+- 'std_force': The standard deviation of the force in grams, over the last
+polling period.
+
+## load_cell_probe
+
+The following information is available for `[load_cell_probe]`:
+- all items from [load_cell](Status_Reference.md#load_cell)
+- all items from [probe](Status_Reference.md#probe)
+- 'endstop_tare_counts': the load cell probe keeps a tare value independent of
+the load cell. This re-set at the start of each probe.
+- 'last_trigger_time': timestamp of the last homing trigger
+
 ## manual_probe
 
 The following information is available in the
@@ -292,13 +314,6 @@ active.
 understands it).
 - `z_position_lower`: Last probe attempt just lower than the current height.
 - `z_position_upper`: Last probe attempt just greater than the current height.
-
-## manual_stepper
-
-The following information is available in the
-`manual_stepper` object:
-- `enabled`: Returns True if the stepper is currently enabled.
-- `position`: The requested position.
 
 ## mcu
 
@@ -452,6 +467,7 @@ The following information is available in
 
 [bme280 config_section_name](Config_Reference.md#bmp280bme280bme680-temperature-sensor),
 [htu21d config_section_name](Config_Reference.md#htu21d-sensor),
+[sht3x config_section_name](Config_Reference.md#sht31-sensor),
 [lm75 config_section_name](Config_Reference.md#lm75-temperature-sensor),
 [temperature_host config_section_name](Config_Reference.md#host-temperature-sensor)
 and
@@ -459,7 +475,7 @@ and
 objects:
 - `temperature`: The last read temperature from the sensor.
 - `humidity`, `pressure`, `gas`: The last read values from the sensor
-  (only on bme280, htu21d, and lm75 sensors).
+  (only on bme280, htu21d, sht3x and lm75 sensors).
 
 ## temperature_fan
 

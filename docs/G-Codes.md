@@ -686,6 +686,40 @@ and RAW sensor value for calibration points.
 #### DISABLE_FILAMENT_WIDTH_LOG
 `DISABLE_FILAMENT_WIDTH_LOG`: Turn off diameter logging.
 
+### [load_cell]
+
+The following commands are enabled if a
+[load_cell config section](Config_Reference.md#load_cell) has been enabled.
+
+### LOAD_CELL_DIAGNOSTIC
+`LOAD_CELL_DIAGNOSTIC [LOAD_CELL=<config_name>]`: This command collects 10
+seconds of load cell data and reports statistics that can help you verify proper
+operation of the load cell. This command can be run on both calibrated and
+uncalibrated load cells.
+
+### CALIBRATE_LOAD_CELL
+`CALIBRATE_LOAD_CELL [LOAD_CELL=<config_name>]`: Start the guided calibration
+utility. Calibration is a 3 step process:
+1. First you remove all load from the load cell and run the `TARE` command
+1. Next you apply a known load to the load cell and run the
+`CALIBRATE GRAMS=nnn` command
+1. Finally use the `ACCEPT` command to save the results
+
+You can cancel the calibration process at any time with `ABORT`.
+
+### TARE_LOAD_CELL
+`TARE_LOAD_CELL [LOAD_CELL=<config_name>]`: This works just like the tare button
+on digital scale. It sets the current raw reading of the load cell to be the
+zero point reference value. The response is the percentage of the sensors range
+that was read and the raw value in counts.
+
+### READ_LOAD_CELL load_cell="name"
+`READ_LOAD_CELL [LOAD_CELL=<config_name>]`:
+This command takes a reading from the load cell. The response is the percentage
+of the sensors range that was read and the raw value in counts. If the load cell
+is calibrated a force in grams is also reported.
+
+
 ### [heaters]
 
 The heaters module is automatically loaded if a heater is defined in
@@ -983,6 +1017,28 @@ direction as well as Z.
 babystepping), and subtract if from the probe's z_offset.  This acts
 to take a frequently used babystepping value, and "make it permanent".
 Requires a `SAVE_CONFIG` to take effect.
+
+### [probe_eddy_current]
+
+The following commands are available when a
+[probe_eddy_current config section](Config_Reference.md#probe_eddy_current)
+is enabled.
+
+#### PROBE_EDDY_CURRENT_CALIBRATE
+`PROBE_EDDY_CURRENT_CALIBRATE CHIP=<config_name>`: This starts a tool
+that calibrates the sensor resonance frequencies to corresponding Z
+heights. The tool will take a couple of minutes to complete. After
+completion, use the SAVE_CONFIG command to store the results in the
+printer.cfg file.
+
+#### LDC_CALIBRATE_DRIVE_CURRENT
+`LDC_CALIBRATE_DRIVE_CURRENT CHIP=<config_name>` This tool will
+calibrate the ldc1612 DRIVE_CURRENT0 register. Prior to using this
+tool, move the sensor so that it is near the center of the bed and
+about 20mm above the bed surface. Run this command to determine an
+appropriate DRIVE_CURRENT for the sensor. After running this command
+use the SAVE_CONFIG command to store that new setting in the
+printer.cfg config file.
 
 ### [pwm_cycle_time]
 
@@ -1371,15 +1427,19 @@ The following commands are available when the
 is enabled.
 
 #### SET_Z_THERMAL_ADJUST
-`SET_Z_THERMAL_ADJUST [ENABLE=<0:1>] [TEMP_COEFF=<value>] [REF_TEMP=<value>]`:
-Enable or disable the Z thermal adjustment with `ENABLE`. Disabling does not
-remove any adjustment already applied, but will freeze the current adjustment
+`SET_Z_THERMAL_ADJUST [COMPONENT=name] [ENABLE=<0:1>] [TEMP_COEFF=<value>]
+ [REF_TEMP=<value>]`:
+- `COMPONENT`: if multiple thermal adjustments are defined use `COMPONENT` to
+specify which one to adjust.
+- `ENABLE`: Enable or disable the Z thermal adjustment. Disabling does not
+remove any adjustment already applied, but will freeze the current adjustment 
 value - this prevents potentially unsafe downward Z movement. Re-enabling can
 potentially cause upward tool movement as the adjustment is updated and applied.
-`TEMP_COEFF` allows run-time tuning of the adjustment temperature coefficient
+- `TEMP_COEFF`: allows run-time tuning of the adjustment temperature coefficient
 (i.e. the `TEMP_COEFF` config parameter). `TEMP_COEFF` values are not saved to
-the config. `REF_TEMP` manually overrides the reference temperature typically
-set during homing (for use in e.g. non-standard homing routines) - will be reset
+the config.
+- `REF_TEMP` manually overrides the reference temperature typically set during
+homing (for use in e.g. non-standard homing routines) - will be reset
 automatically upon homing.
 
 ### [z_tilt]
@@ -1393,3 +1453,39 @@ command will probe the points specified in the config and then make independent
 adjustments to each Z stepper to compensate for tilt. See the PROBE command for
 details on the optional probe parameters. The optional `HORIZONTAL_MOVE_Z`
 value overrides the `horizontal_move_z` option specified in the config file.
+
+### [temperature_probe]
+
+The following commands are available when a
+[temperature_probe config section](Config_Reference.md#temperature_probe)
+is enabled.
+
+#### TEMPERATURE_PROBE_CALIBRATE
+`TEMPERATURE_PROBE_CALIBRATE [PROBE=<probe name>] [TARGET=<value>] [STEP=<value>]`:
+Initiates probe drift calibration for eddy current based probes.  The `TARGET`
+is a target temperature for the last sample.  When the temperature recorded
+during a sample exceeds the `TARGET` calibration will complete.  The `STEP`
+parameter sets temperature delta (in C) between samples. After a sample has
+been taken, this delta is used to schedule a call to `TEMPERATURE_PROBE_NEXT`.
+The default `STEP` is 2.
+
+#### TEMPERATURE_PROBE_NEXT
+`TEMPERATURE_PROBE_NEXT`: After calibration has started this command is run to
+take the next sample.  It is automatically scheduled to run when the delta
+specified by `STEP` has been reached, however its also possible to manually run
+this command to force a new sample.  This command is only available during
+calibration.
+
+#### TEMPERATURE_PROBE_COMPLETE:
+`TEMPERATURE_PROBE_COMPLETE`:  Can be used to end calibration and save the
+current result before the `TARGET` temperature is reached.  This command
+is only available during calibration.
+
+#### ABORT
+`ABORT`:  Aborts the calibration process, discarding the current results.
+This command is only available during drift calibration.
+
+### TEMPERATURE_PROBE_ENABLE
+`TEMPERATURE_PROBE_ENABLE ENABLE=[0|1]`: Sets temperature drift
+compensation on or off. If ENABLE is set to 0, drift compensation
+will be disabled, if set to 1 it is enabled.

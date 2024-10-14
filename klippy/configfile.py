@@ -69,6 +69,8 @@ class ConfigWrapper:
         return self._get_wrapper(self.fileconfig.getboolean, option, default,
                                  note_valid=note_valid)
     def getchoice(self, option, choices, default=sentinel, note_valid=True):
+        if type(choices) == type([]):
+            choices = {i: i for i in choices}
         if choices and type(list(choices.keys())[0]) == int:
             c = self.getint(option, default, note_valid=note_valid)
         else:
@@ -316,7 +318,7 @@ class PrinterConfig:
         self.printer.set_rollover_info("config", "\n".join(lines))
     # Status reporting
     def runtime_warning(self, msg):
-        logging.warn(msg)
+        logging.warning(msg)
         res = {'type': 'runtime_warning', 'message': msg}
         self.runtime_warnings.append(res)
         self.status_warnings = self.runtime_warnings + self.deprecate_warnings

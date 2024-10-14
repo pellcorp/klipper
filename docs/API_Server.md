@@ -364,6 +364,112 @@ and might later produce asynchronous messages such as:
 The "header" field in the initial query response is used to describe
 the fields found in later "data" responses.
 
+### hx71x/dump_hx71x
+
+This endpoint is used to subscribe to raw HX711 and HX717 ADC data.
+Obtaining these low-level ADC updates may be useful for diagnostic
+and debugging purposes. Using this endpoint may increase Klipper's
+system load.
+
+A request may look like:
+`{"id": 123, "method":"hx71x/dump_hx71x",
+"params": {"sensor": "load_cell", "response_template": {}}}`
+and might return:
+`{"id": 123,"result":{"header":["time","counts","value"]}}`
+and might later produce asynchronous messages such as:
+`{"params":{"data":[[3292.432935, 562534, 0.067059278],
+[3292.4394937, 5625322, 0.670590639]]}}`
+
+### ads1220/dump_ads1220
+
+This endpoint is used to subscribe to raw ADS1220 ADC data.
+Obtaining these low-level ADC updates may be useful for diagnostic
+and debugging purposes. Using this endpoint may increase Klipper's
+system load.
+
+A request may look like:
+`{"id": 123, "method":"ads1220/dump_ads1220",
+"params": {"sensor": "load_cell", "response_template": {}}}`
+and might return:
+`{"id": 123,"result":{"header":["time","counts","value"]}}`
+and might later produce asynchronous messages such as:
+`{"params":{"data":[[3292.432935, 562534, 0.067059278],
+[3292.4394937, 5625322, 0.670590639]]}}`
+
+### load_cell/dump_force
+
+This endpoint is used to subscribe to force data produced by a load_cell.
+Using this endpoint may increase Klipper's system load.
+
+A request may look like:
+`{"id": 123, "method":"load_cell/dump_force",
+"params": {"sensor": "load_cell", "response_template": {}}}`
+and might return:
+`{"id": 123,"result":{"header":["time", "force (g)", "counts", "tare_counts"]}}`
+and might later produce asynchronous messages such as:
+`{"params":{"data":[[3292.432935, 40.65, 562534, -234467]]}}`
+
+The "header" field in the initial query response is used to describe
+the fields found in later "data" responses.
+
+### load_cell_probe/dump_taps
+
+This endpoint is used to subscribe to details of probing "tap" events.
+Using this endpoint may increase Klipper's system load.
+
+A request may look like:
+`{"id": 123, "method":"load_cell/dump_force",
+"params": {"sensor": "load_cell", "response_template": {}}}`
+and might return:
+`{"id": 123,"result":{"header":["probe_tap_event"]}}`
+and might later produce asynchronous messages such as:
+```
+{"params":{"tap":'{
+   "is_valid": true,
+   "time": [118032.28039, 118032.2834, ...],
+   "force": [-459.4213119680034, -458.1640702543264, ...],
+   "position": [[150, 150, 0.5258747448442332],
+       [150, 150, 0.5258747448442332], ...],
+   "home_end_time": 118032.56658077835,
+   "tap_angles": [87.18541701142391, -87.5965850636961,
+                 -65.3861364656239, 65.43335592854575],
+   "moves": [
+      {
+         "print_time": 118032.44926297224,
+         "z_r": -1,
+         "move_t": 0.014285714285714285,
+         "start_x": 150,
+         "start_y": 150,
+         "start_v": 0,
+         "start_z": 0.5258747448442332,
+         "accel": 350,
+         "x_r": 0,
+         "y_r": 0
+      }, ...
+   ],
+   "tap_pos": [150, 150, 0.026494399229597846],
+   "pullback_start_time": 118032.9893979,
+   "pullback_end_time": 118033.30281218572,
+   "lines": [{"slope":-1.4344588231023843, "intercept":168852.27124713376},
+       {"slope":-20953.17324785847, "intercept":2473156115.3118067}, ...
+   ],
+   "points": [{"force":-460.174769196281, "time":118032.28039},
+       {"force":-460.5688282112242, "time":118032.55509918553}, ...
+   ],
+   "tap_r_squared": [[96.5, 47.3, -317, -994.9, -2118.4],
+       [94.6, 40.8, -329.5, -952.5, -1991.1], ...
+   ]
+}}}
+```
+
+This data can be used to render:
+* The position of the toolhead throughout the probe
+* The time/force graph
+* The tap lines and elbow points detected by the tap algorithm
+
+The `tap_angles`, `lines`, `tap_r_squared` and `points` may all be used in
+deciding of a tap was good or bad.
+
 ### pause_resume/cancel
 
 This endpoint is similar to running the "PRINT_CANCEL" G-Code command.
@@ -401,3 +507,130 @@ might return:
 
 As with the "gcode/script" endpoint, this endpoint only completes
 after any pending G-Code commands complete.
+
+### bed_mesh/dump_mesh
+
+Dumps the configuration and state for the current mesh and all
+saved profiles.
+
+For example:
+`{"id": 123, "method": "bed_mesh/dump_mesh"}`
+
+might return:
+
+```
+{
+    "current_mesh": {
+        "name": "eddy-scan-test",
+        "probed_matrix": [...],
+        "mesh_matrix": [...],
+        "mesh_params": {
+            "x_count": 9,
+            "y_count": 9,
+            "mesh_x_pps": 2,
+            "mesh_y_pps": 2,
+            "algo": "bicubic",
+            "tension": 0.5,
+            "min_x": 20,
+            "max_x": 330,
+            "min_y": 30,
+            "max_y": 320
+        }
+    },
+    "profiles": {
+        "default": {
+            "points": [...],
+            "mesh_params": {
+                "min_x": 20,
+                "max_x": 330,
+                "min_y": 30,
+                "max_y": 320,
+                "x_count": 9,
+                "y_count": 9,
+                "mesh_x_pps": 2,
+                "mesh_y_pps": 2,
+                "algo": "bicubic",
+                "tension": 0.5
+            }
+        },
+        "eddy-scan-test": {
+            "points": [...],
+            "mesh_params": {
+                "x_count": 9,
+                "y_count": 9,
+                "mesh_x_pps": 2,
+                "mesh_y_pps": 2,
+                "algo": "bicubic",
+                "tension": 0.5,
+                "min_x": 20,
+                "max_x": 330,
+                "min_y": 30,
+                "max_y": 320
+            }
+        },
+        "eddy-rapid-test": {
+            "points": [...],
+            "mesh_params": {
+                "x_count": 9,
+                "y_count": 9,
+                "mesh_x_pps": 2,
+                "mesh_y_pps": 2,
+                "algo": "bicubic",
+                "tension": 0.5,
+                "min_x": 20,
+                "max_x": 330,
+                "min_y": 30,
+                "max_y": 320
+            }
+        }
+    },
+    "calibration": {
+        "points": [...],
+        "config": {
+            "x_count": 9,
+            "y_count": 9,
+            "mesh_x_pps": 2,
+            "mesh_y_pps": 2,
+            "algo": "bicubic",
+            "tension": 0.5,
+            "mesh_min": [
+                20,
+                30
+            ],
+            "mesh_max": [
+                330,
+                320
+            ],
+            "origin": null,
+            "radius": null
+        },
+        "probe_path": [...],
+        "rapid_path": [...]
+    },
+    "probe_offsets": [
+        0,
+        25,
+        0.5
+    ],
+    "axis_minimum": [
+        0,
+        0,
+        -5,
+        0
+    ],
+    "axis_maximum": [
+        351,
+        358,
+        330,
+        0
+    ]
+}
+```
+
+The `dump_mesh` endpoint takes one optional parameter, `mesh_args`.
+This parameter must be an object, where the keys and values are
+parameters available to [BED_MESH_CALIBRATE](#bed_mesh_calibrate).
+This will update the mesh configuration and probe points using the
+supplied parameters prior to returning the result.   It is recommended
+to omit mesh parameters unless it is desired to visualize the probe points
+and/or travel path before performing `BED_MESH_CALIBRATE`.
