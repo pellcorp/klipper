@@ -19,7 +19,7 @@ static struct timer periodic_timer, sentinel_timer, deleted_timer;
 
 static struct {
     struct timer *timer_list, *last_insert;
-    int8_t tasks_status;
+    int8_t tasks_status, tasks_busy;
     uint8_t shutdown_status, shutdown_reason;
 } SchedStatus = {.timer_list = &periodic_timer, .last_insert = &periodic_timer};
 
@@ -209,7 +209,10 @@ sched_wake_tasks(void)
 uint8_t
 sched_tasks_busy(void)
 {
-    return SchedStatus.tasks_status >= TS_REQUESTED;
+    if (SchedStatus.tasks_busy >= TS_REQUESTED)
+        return 1;
+    SchedStatus.tasks_busy = SchedStatus.tasks_status;
+    return 0;
 }
 
 // Note that a task is ready to run
@@ -243,7 +246,7 @@ run_tasks(void)
             irq_disable();
             if (SchedStatus.tasks_status != TS_REQUESTED) {
                 // Sleep processor (only run timers) until tasks woken
-                SchedStatus.tasks_status = TS_IDLE;
+                SchedStatus.tasks_status = SchedStatus.tasks_busy = TS_IDLE;
                 do {
                     irq_wait();
                 } while (SchedStatus.tasks_status != TS_REQUESTED);
