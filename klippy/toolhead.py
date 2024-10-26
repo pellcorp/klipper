@@ -212,6 +212,7 @@ class ToolHead:
             m for n, m in self.printer.lookup_objects(module='mcu')]
         self.mcu = self.all_mcus[0]
         self.lookahead = LookAheadQueue(self)
+        self.move_queue = self.lookahead
         self.lookahead.set_flush_time(BUFFER_TIME_HIGH)
         self.commanded_pos = [0., 0., 0., 0.]
         # Velocity and acceleration control

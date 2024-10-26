@@ -33,20 +33,22 @@ class TrapezoidalMove(object):
         self.z_r = float(move.z_r)
 
     def to_dict(self):
-        return {'print_time': float(self.print_time),
-                'move_t': float(self.move_t),
-                'start_v': float(self.start_v),
-                'accel': float(self.accel),
-                'start_x': float(self.start_x),
-                'start_y': float(self.start_y),
-                'start_z': float(self.start_z),
-                'x_r': float(self.x_r),
-                'y_r': float(self.y_r),
-                'z_r': float(self.z_r)
+        return {
+            'print_time': float(self.print_time),
+            'move_t': float(self.move_t),
+            'start_v': float(self.start_v),
+            'accel': float(self.accel),
+            'start_x': float(self.start_x),
+            'start_y': float(self.start_y),
+            'start_z': float(self.start_z),
+            'x_r': float(self.x_r),
+            'y_r': float(self.y_r),
+            'z_r': float(self.z_r)
         }
 
 # point on a time/force graph
 class ForcePoint(object):
+
     def __init__(self, time, force):
         self.time = time
         self.force = force
@@ -63,8 +65,7 @@ class ForceLine(object):
     # measure angles between lines at the 1g == 1ms scale
     # returns +/- 0-180. Positive values represent clockwise rotation
     def angle(self, line, time_scale=0.001):
-        radians = (math.atan2(self.slope * time_scale, 1) -
-                   math.atan2(line.slope * time_scale, 1))
+        radians = (math.atan2(self.slope * time_scale, 1) - math.atan2(line.slope * time_scale, 1))
         return math.degrees(radians)
 
     def find_force(self, time):
@@ -83,16 +84,20 @@ class ForceLine(object):
     def to_dict(self):
         return {'slope': self.slope, 'intercept': self.intercept}
 
+
 # convert double to signed fixed point Q12.19 integer
 Q12_INT_BITS = 12
 Q12_FRAC_BITS = (32 - (1 + Q12_INT_BITS))
+
+
 def as_fixedQ12(val):
-    return int(val * (2 ** Q12_FRAC_BITS))
+    return int(val * (2**Q12_FRAC_BITS))
+
 
 # Digital filter designer and container
 class DigialFilter:
-    def __init__(self, sps, cfg_error, highpass=None, lowpass=None,
-                    notches=None, notch_quality=2.0):
+
+    def __init__(self, sps, cfg_error, highpass=None, lowpass=None, notches=None, notch_quality=2.0):
         self.filter_sections = None
         self.sample_frequency = sps
         if not (highpass or lowpass or notches):
@@ -113,8 +118,7 @@ class DigialFilter:
 
     def _butter(self, frequency, btype):
         import scipy.signal as signal
-        return signal.butter(2, Wn=frequency, btype=btype,
-                             fs=self.sample_frequency, output='sos')
+        return signal.butter(2, Wn=frequency, btype=btype, fs=self.sample_frequency, output='sos')
 
     def _notch(self, freq, quality):
         import scipy.signal as signal
@@ -145,13 +149,16 @@ class DigialFilter:
     def has_filters(self):
         return self.filter_sections is not None
 
+
 #########################
 # Math Support Functions
+
 
 # compute the index in the time array when some value was surpassed
 def index_near(time, instant):
     import numpy as np
-    return int(np.argmax(np.asarray(time) >= instant) or len(time) -1)
+    return int(np.argmax(np.asarray(time) >= instant) or len(time) - 1)
+
 
 # helper class for working with a time/force graph
 # work with subsections to find elbows and best fit lines
@@ -206,9 +213,9 @@ class ForceGraph:
         next_error = self._two_lines_error(time, force, start_index + 1)
         direction = 1 if best_error > next_error else -1
         i = start_index
-        while(True):  # todo: bounds checking
+        while (True):  # todo: bounds checking
             i += direction
-            error = self. _two_lines_error(time, force, i)
+            error = self._two_lines_error(time, force, i)
             if error < best_error:
                 best_error = error
                 best_fit_index = i
@@ -229,8 +236,7 @@ class ForceGraph:
 
     def index_near(self, instant):
         import numpy as np
-        return int(np.argmax(np.asarray(self.time) >= instant)
-                   or len(self.time) - 1)
+        return int(np.argmax(np.asarray(self.time) >= instant) or len(self.time) - 1)
 
     def line(self, start_idx, end_idx, discard_left=0, discard_right=0):
         t, f = self._split(start_idx, end_idx, discard_left, discard_right)
@@ -241,8 +247,7 @@ class ForceGraph:
     #    *-----*|       /*-----*
     #           |      /
     #           *----*/
-    def tap_decompose(self, homing_end_time, pullback_start_time,
-                      discard=0):
+    def tap_decompose(self, homing_end_time, pullback_start_time, discard=0):
         homing_end_idx = self.index_near(homing_end_time)
         pullback_start_idx = self.index_near(pullback_start_time)
         contact_elbow_idx = self.find_elbow(0, homing_end_idx)
@@ -250,8 +255,7 @@ class ForceGraph:
         l1 = self.line(0, contact_elbow_idx, discard, discard)
         # sometime after contact_elbow_idx is the peak force and the start of
         # the dwell line
-        dwell_start_idx = self.find_elbow(contact_elbow_idx,
-                                           pullback_start_idx)
+        dwell_start_idx = self.find_elbow(contact_elbow_idx, pullback_start_idx)
         # l2 is the compression line, it may have very few points so no discard
         l2 = self.line(contact_elbow_idx, dwell_start_idx)
         # l3 is the dwell line
@@ -288,20 +292,21 @@ def segment_variance(force, time, start, end, line):
 def elbow_r_squared(force, time, elbow_idx, widths, left_line, right_line):
     r_squared = []
     for width in widths:
-        l_tv, l_dv = segment_variance(force, time,
-                                elbow_idx - width, elbow_idx, left_line)
-        r_tv, r_dv = segment_variance(force, time,
-                                elbow_idx, elbow_idx + width, right_line)
+        l_tv, l_dv = segment_variance(force, time, elbow_idx - width, elbow_idx, left_line)
+        r_tv, r_dv = segment_variance(force, time, elbow_idx, elbow_idx + width, right_line)
         r2 = 1 - ((l_dv + r_dv) / (l_tv + r_tv))
         # returns r squared as a percentage. -350% is bad. 80% is good!
         r_squared.append(round((r2 * 100.), 1))
     return r_squared
 
+
 # TODO: maybe discard points can scale with sample rate from 1 to 3
 DEFAULT_DISCARD_POINTS = 3
+
+
 class TapAnalysis(object):
-    def __init__(self, printer, samples, tap_filter,
-                 discard=DEFAULT_DISCARD_POINTS):
+
+    def __init__(self, printer, samples, tap_filter, discard=DEFAULT_DISCARD_POINTS):
         import numpy as np
         self.printer = printer
         self.discard = discard
@@ -310,14 +315,12 @@ class TapAnalysis(object):
         self.force = tap_filter.filtfilt(np_samples[:, 1])
         self.force_graph = ForceGraph(self.time, self.force)
         self.sample_time = np.average(np.diff(self.time))
-        self.r_squared_widths = [int((n * 0.01) // self.sample_time)
-                                 for n in range(2, 7)]
+        self.r_squared_widths = [int((n * 0.01) // self.sample_time) for n in range(2, 7)]
         trapq = printer.lookup_object('motion_report').trapqs['toolhead']
         self.moves = self._extract_trapq(trapq)
         self.home_end_time = self._recalculate_homing_end()
         self.pullback_start_time = self.moves[-3].print_time
-        self.pullback_end_time = (self.moves[-1].print_time
-                                  + self.moves[-1].move_t)
+        self.pullback_end_time = (self.moves[-1].print_time + self.moves[-1].move_t)
         self.position = self._extract_pos_history()
         self.is_valid = False
         self.tap_pos = None
@@ -345,13 +348,9 @@ class TapAnalysis(object):
             if start_time <= print_time < end_time:
                 # we have found the move
                 move_t = move.move_t
-                move_time = max(0.,
-                        min(move_t, print_time - move.print_time))
-                dist = ((move.start_v + .5 * move.accel * move_time)
-                        * move_time)
-                pos = ((move.start_x + move.x_r * dist,
-                        move.start_y + move.y_r * dist,
-                        move.start_z + move.z_r * dist))
+                move_time = max(0., min(move_t, print_time - move.print_time))
+                dist = ((move.start_v + .5 * move.accel * move_time) * move_time)
+                pos = ((move.start_x + move.x_r * dist, move.start_y + move.y_r * dist, move.start_z + move.z_r * dist))
                 return pos
             else:
                 continue
@@ -365,11 +364,9 @@ class TapAnalysis(object):
         halt_move = self.moves[-4]
         # acceleration should be 0! This is the 'coasting' move:
         if homing_move.accel != 0.:
-            raise self.printer.command_error(
-                    'Unexpected acceleration in coasting move')
+            raise self.printer.command_error('Unexpected acceleration in coasting move')
         # how long did it take to get to end_z?
-        homing_move.move_t = abs((halt_move.start_z - homing_move.start_z)
-                                 / homing_move.start_v)
+        homing_move.move_t = abs((halt_move.start_z - homing_move.start_z) / homing_move.start_v)
         return homing_move.print_time + homing_move.move_t
 
     def _extract_trapq(self, trapq):
@@ -380,14 +377,12 @@ class TapAnalysis(object):
             # DEBUG: enable to see trapq contents
             # logging.info("trapq move: %s" % (moves_out[-1].to_dict(),))
         num_moves = len(moves_out)
-        if num_moves < 5 or num_moves > 6:
-            raise self.printer.command_error(
-                "Expected tap to be 5 to 6 moves long was %s" % (num_moves,))
+        if num_moves < 5 or num_moves > 7:
+            raise self.printer.command_error("Expected tap to be 5 to 7 moves long was %s" % (num_moves, ))
         return moves_out
 
     def analyze(self):
-        points, lines = self.force_graph.tap_decompose(self.home_end_time,
-                            self.pullback_start_time, self.discard)
+        points, lines = self.force_graph.tap_decompose(self.home_end_time, self.pullback_start_time, self.discard)
         self.tap_points = points
         self.tap_lines = lines
         if not self.validate_order():
@@ -417,15 +412,13 @@ class TapAnalysis(object):
     # validate that a set of ForcePoint objects are in chronological order
     def validate_order(self):
         p = self.tap_points
-        return (p[0].time < p[1].time < p[2].time
-                < p[3].time < p[4].time < p[5].time)
+        return (p[0].time < p[1].time < p[2].time < p[3].time < p[4].time < p[5].time)
 
     # Validate that the rotations between lines form a tap shape
     def validate_elbow_rotation(self):
         a1, a2, a3, a4 = self.tap_angles
         # with two polarities there are 2 valid tap shapes:
-        return ((a1 > 0 and a2 < 0 and a3 < 0 and a4 > 0) or
-                (a1 < 0 and a2 > 0 and a3 > 0 and a4 < 0))
+        return ((a1 > 0 and a2 < 0 and a3 < 0 and a4 > 0) or (a1 < 0 and a2 > 0 and a3 > 0 and a4 < 0))
 
     # check for space around elbows to calculate r_squared
     def validate_elbow_clearance(self):
@@ -436,8 +429,7 @@ class TapAnalysis(object):
 
     # the proposed break contact point must fall inside the pullback move
     def validate_break_contact_time(self, break_contact_time):
-        return (self.pullback_start_time < break_contact_time
-                < self.pullback_end_time)
+        return (self.pullback_start_time < break_contact_time < self.pullback_end_time)
 
     def calculate_angles(self):
         l1, l2, l3, l4, l5 = self.tap_lines
@@ -445,11 +437,11 @@ class TapAnalysis(object):
 
     def calculate_r_squared(self):
         r_squared = []
-        for i, elbow in enumerate(self.tap_points[1: -1]):
+        for i, elbow in enumerate(self.tap_points[1:-1]):
             elbow_idx = self.force_graph.index_near(elbow.time)
-            r_squared.append(elbow_r_squared(self.force, self.time, elbow_idx,
-                            self.r_squared_widths,
-                            self.tap_lines[i], self.tap_lines[i + 1]))
+            r_squared.append(
+                elbow_r_squared(self.force, self.time, elbow_idx, self.r_squared_widths, self.tap_lines[i],
+                                self.tap_lines[i + 1]))
         return r_squared
 
     # convert to dictionary for JSON encoder
@@ -480,18 +472,20 @@ def getfloatlist(config, option, above=None, below=None, max_len=None):
         validatefloat(config, option, value, above, below)
     return values
 
+
 def validatefloat(config, option, value, above, below):
     if above is not None and value <= above:
-        raise config.error("Option '%s' in section '%s' must be above %s"
-                    % (option, config.get_name(), above))
+        raise config.error("Option '%s' in section '%s' must be above %s" % (option, config.get_name(), above))
     if below is not None and value >= below:
-        raise config.error("Option '%s' in section '%s' must be below %s"
-                     % (option, config.get_name(), below))
+        raise config.error("Option '%s' in section '%s' must be below %s" % (option, config.get_name(), below))
 
 NOZZLE_CLEANER = "{action_respond_info(\"Bad tap detected, nozzle needs" \
         " cleaning. nozzle_cleaner_gcode not configured!\")}"
+
+
 # Helper to track multiple probe attempts in a single command
 class LoadCellProbeSessionHelper:
+
     def __init__(self, config, mcu_probe):
         self.printer = config.get_printer()
         self.mcu_probe = mcu_probe
@@ -500,40 +494,31 @@ class LoadCellProbeSessionHelper:
         # Infer Z position to move to during a probe
         if config.has_section('stepper_z'):
             zconfig = config.getsection('stepper_z')
-            self.z_position = zconfig.getfloat('position_min', 0.,
-                                               note_valid=False)
+            self.z_position = zconfig.getfloat('position_min', 0., note_valid=False)
         else:
             pconfig = config.getsection('printer')
-            self.z_position = pconfig.getfloat('minimum_z_position', 0.,
-                                               note_valid=False)
+            self.z_position = pconfig.getfloat('minimum_z_position', 0., note_valid=False)
         self.homing_helper = probe.HomingViaProbeHelper(config, mcu_probe)
         # Configurable probing speeds
         self.speed = config.getfloat('speed', 5.0, above=0.)
         self.lift_speed = config.getfloat('lift_speed', self.speed, above=0.)
         # Multi-sample support (for improved accuracy)
         self.sample_count = config.getint('samples', 1, minval=1)
-        self.sample_retract_dist = config.getfloat('sample_retract_dist', 2.,
-                                                   above=0.)
+        self.sample_retract_dist = config.getfloat('sample_retract_dist', 2., above=0.)
         atypes = {'median': 'median', 'average': 'average'}
-        self.samples_result = config.getchoice('samples_result', atypes,
-                                               'average')
-        self.samples_tolerance = config.getfloat('samples_tolerance', 0.100,
-                                                 minval=0.)
-        self.samples_retries = config.getint('samples_tolerance_retries', 0,
-                                             minval=0)
+        self.samples_result = config.getchoice('samples_result', atypes, 'average')
+        self.samples_tolerance = config.getfloat('samples_tolerance', 0.100, minval=0.)
+        self.samples_retries = config.getint('samples_tolerance_retries', 0, minval=0)
         # Session state
         self.multi_probe_pending = False
         self.results = []
         # Register event handlers
-        self.printer.register_event_handler("gcode:command_error",
-                                            self._handle_command_error)
+        self.printer.register_event_handler("gcode:command_error", self._handle_command_error)
         # load cell probe options
         self.bad_tap_retries = config.getint('bad_tap_retries', 1, minval=0)
-        self.nozzle_cleaner_module = self.load_module(
-                                        config, 'nozzle_cleaner_module', None)
+        self.nozzle_cleaner_module = self.load_module(config, 'nozzle_cleaner_module', None)
         gcode_macro = self.printer.load_object(config, 'gcode_macro')
-        self.nozzle_cleaner_gcode = gcode_macro.load_template(config,
-                                    'nozzle_cleaner_gcode', NOZZLE_CLEANER)
+        self.nozzle_cleaner_gcode = gcode_macro.load_template(config, 'nozzle_cleaner_gcode', NOZZLE_CLEANER)
 
     def _handle_command_error(self):
         if self.multi_probe_pending:
@@ -543,8 +528,7 @@ class LoadCellProbeSessionHelper:
                 logging.exception("Multi-probe end")
 
     def _probe_state_error(self):
-        raise self.printer.command_error(
-            "Internal probe error - start/end probe session mismatch")
+        raise self.printer.command_error("Internal probe error - start/end probe session mismatch")
 
     def load_module(self, config, name, default):
         module = config.get(name, default=None)
@@ -571,20 +555,19 @@ class LoadCellProbeSessionHelper:
         probe_speed = gcmd.get_float("PROBE_SPEED", self.speed, above=0.)
         lift_speed = gcmd.get_float("LIFT_SPEED", self.lift_speed, above=0.)
         samples = gcmd.get_int("SAMPLES", self.sample_count, minval=1)
-        sample_retract_dist = gcmd.get_float("SAMPLE_RETRACT_DIST",
-                                             self.sample_retract_dist, above=0.)
-        samples_tolerance = gcmd.get_float("SAMPLES_TOLERANCE",
-                                           self.samples_tolerance, minval=0.)
-        samples_retries = gcmd.get_int("SAMPLES_TOLERANCE_RETRIES",
-                                       self.samples_retries, minval=0)
+        sample_retract_dist = gcmd.get_float("SAMPLE_RETRACT_DIST", self.sample_retract_dist, above=0.)
+        samples_tolerance = gcmd.get_float("SAMPLES_TOLERANCE", self.samples_tolerance, minval=0.)
+        samples_retries = gcmd.get_int("SAMPLES_TOLERANCE_RETRIES", self.samples_retries, minval=0)
         samples_result = gcmd.get("SAMPLES_RESULT", self.samples_result)
-        return {'probe_speed': probe_speed,
-                'lift_speed': lift_speed,
-                'samples': samples,
-                'sample_retract_dist': sample_retract_dist,
-                'samples_tolerance': samples_tolerance,
-                'samples_tolerance_retries': samples_retries,
-                'samples_result': samples_result}
+        return {
+            'probe_speed': probe_speed,
+            'lift_speed': lift_speed,
+            'samples': samples,
+            'sample_retract_dist': sample_retract_dist,
+            'samples_tolerance': samples_tolerance,
+            'samples_tolerance_retries': samples_retries,
+            'samples_result': samples_result
+        }
 
     # execute nozzle cleaning routine
     def clean_nozzle(self, retries):
@@ -620,8 +603,7 @@ class LoadCellProbeSessionHelper:
         self.printer.send_event("probe:update_results", epos)
         # Report results
         gcode = self.printer.lookup_object('gcode')
-        gcode.respond_info("probe at %.3f,%.3f is z=%.6f"
-                           % (epos[0], epos[1], epos[2]))
+        gcode.respond_info("probe at %.3f,%.3f is z=%.6f" % (epos[0], epos[1], epos[2]))
         return epos[:3], is_good
 
     def probe_cycle(self, probexy, params):
@@ -636,14 +618,11 @@ class LoadCellProbeSessionHelper:
                 retries += 1
                 # TODO: maybe goto the probing location after cleaning?
             else:
-                raise self.printer.command_error(
-                    'Bad taps exceeded bas_tap_retries')
+                raise self.printer.command_error('Bad taps exceeded bas_tap_retries')
 
     def retract(self, probexy, pos, params):
         toolhead = self.printer.lookup_object('toolhead')
-        toolhead.manual_move(
-            probexy + [pos[2] + params['sample_retract_dist']],
-            params['lift_speed'])
+        toolhead.manual_move(probexy + [pos[2] + params['sample_retract_dist']], params['lift_speed'])
 
     def run_probe(self, gcmd):
         if not self.multi_probe_pending:
@@ -660,7 +639,7 @@ class LoadCellProbeSessionHelper:
             positions.append(pos)
             # Check samples tolerance
             z_positions = [p[2] for p in positions]
-            if max(z_positions)-min(z_positions) > params['samples_tolerance']:
+            if max(z_positions) - min(z_positions) > params['samples_tolerance']:
                 if retries >= params['samples_tolerance_retries']:
                     raise gcmd.error("Probe samples exceed samples_tolerance")
                 gcmd.respond_info("Probe samples exceed tolerance. Retrying...")
@@ -677,40 +656,32 @@ class LoadCellProbeSessionHelper:
         self.results = []
         return res
 
+
 #class to keep context across probing/homing events
 class ProbeSessionContext():
+
     def __init__(self, config, load_cell_inst):
         self.printer = printer = config.get_printer()
         self.load_cell = load_cell_inst
         self.collector = None
-        self.pullback_distance = config.getfloat('pullback_dist', minval=0.01,
-                                                 maxval=2.0, default=0.1)
+        self.pullback_distance = config.getfloat('pullback_dist', minval=0.01, maxval=2.0, default=0.1)
         sps = self.load_cell.get_sensor().get_samples_per_second()
         # TODO: Math: set the maximum pullback speed such that at least
         # enough samples will be collected
         # e.g. 5 + 1 + (2 * discard)
         default_pullback_speed = sps * 0.001
-        self.pullback_speed = config.getfloat('pullback_speed', minval=0.01,
-                                              maxval=1.0,
-                                              default=default_pullback_speed)
-        self.pullback_extra_time = config.getfloat('pullback_extra_time',
-                                                   minval=0.00, maxval=1.0,
-                                                   default=0.3)
-        self.bad_tap_module = self.load_module(config, 'bad_tap_module',
-                                               BadTapModule())
+        self.pullback_speed = config.getfloat('pullback_speed', minval=0.01, maxval=1.0, default=default_pullback_speed)
+        self.pullback_extra_time = config.getfloat('pullback_extra_time', minval=0.00, maxval=1.0, default=0.3)
+        self.bad_tap_module = self.load_module(config, 'bad_tap_module', BadTapModule())
         # optional filter config
-        tap_notches = getfloatlist(config, "tap_filter_notch", above=0,
-                                   below=math.floor(sps / 2.), max_len=5)
-        notch_quality = config.getfloat("tap_filter_notch_quality",
-                                        minval=0.5, maxval=3.0, default=2.0)
-        self.tap_filter = DigialFilter(sps, config.error, notches=tap_notches,
-                                       notch_quality=notch_quality)
+        tap_notches = getfloatlist(config, "tap_filter_notch", above=0, below=math.floor(sps / 2.), max_len=5)
+        notch_quality = config.getfloat("tap_filter_notch_quality", minval=0.5, maxval=3.0, default=2.0)
+        self.tap_filter = DigialFilter(sps, config.error, notches=tap_notches, notch_quality=notch_quality)
         # webhooks support
         self.wh_helper = load_cell.WebhooksHelper(printer)
         name = config.get_name()
         header = {"header": ["probe_tap_event"]}
-        self.wh_helper.add_mux_endpoint("load_cell_probe/dump_taps",
-                                        "load_cell_probe", name, header)
+        self.wh_helper.add_mux_endpoint("load_cell_probe/dump_taps", "load_cell_probe", name, header)
 
     def load_module(self, config, name, default):
         module = config.get(name, default=None)
@@ -740,12 +711,10 @@ class ProbeSessionContext():
         epos = phoming.probing_move(mcu_probe, pos, speed)
         pullback_end_time = self.pullback_move()
         pullback_end_pos = toolhead.get_position()
-        samples, errors = self.collector.collect_until(pullback_end_time
-                                               + self.pullback_extra_time)
+        samples, errors = self.collector.collect_until(pullback_end_time + self.pullback_extra_time)
         if errors:
-            raise self.printer.command_error(
-                "Sensor reported errors while homing: %i errors, %i overflows"
-                % (errors[0], errors[1]))
+            raise self.printer.command_error("Sensor reported errors while homing: %i errors, %i overflows" %
+                                             (errors[0], errors[1]))
         self.collector = None
         ppa = TapAnalysis(self.printer, samples, self.tap_filter)
         ppa.analyze()
@@ -761,16 +730,18 @@ class ProbeSessionContext():
 
 WATCHDOG_MAX = 3
 MIN_MSG_TIME = 0.100
+
+
 # LoadCellEndstop implements both MCU_endstop and ProbeEndstopWrapper
 class LoadCellEndstop:
     REASON_SENSOR_ERROR = mcu.MCU_trsync.REASON_COMMS_TIMEOUT + 1
+
     def __init__(self, config, load_cell_inst, helper):
         self._config = config
         self._config_name = config.get_name()
         self.printer = printer = config.get_printer()
         self.gcode = printer.lookup_object('gcode')
-        printer.register_event_handler('klippy:mcu_identify',
-                                       self.handle_mcu_identify)
+        printer.register_event_handler('klippy:mcu_identify', self.handle_mcu_identify)
         self._load_cell = load_cell_inst
         self._helper = helper
         self._sensor = sensor = load_cell_inst.get_sensor()
@@ -778,54 +749,51 @@ class LoadCellEndstop:
         self._oid = self._mcu.create_oid()
         self._dispatch = mcu.TriggerDispatch(self._mcu)
         self._rest_time = 1. / float(sensor.get_samples_per_second())
-        self.settling_time = config.getfloat('settling_time', default=0.375,
-                                             minval=0, maxval=1)
+        self.settling_time = config.getfloat('settling_time', default=0.375, minval=0, maxval=1)
 
         # Static triggering
-        self.trigger_force_grams = config.getfloat('trigger_force',
-                                    minval=10., maxval=250., default=75.)
-        self.safety_limit_grams = config.getfloat('safety_limit',
-                                    minval=100., maxval=5000., default=2000.)
+        self.trigger_force_grams = config.getfloat('trigger_force', minval=10., maxval=250., default=75.)
+        self.safety_limit_grams = config.getfloat('safety_limit', minval=100., maxval=5000., default=2000.)
         #TODO: Review: In my view, this should always be 1
-        self.trigger_count = config.getint("trigger_count",
-                                           default=1, minval=1, maxval=5)
+        self.trigger_count = config.getint("trigger_count", default=1, minval=1, maxval=5)
         # optional continuous tearing
         sps = self._load_cell.get_sensor().get_samples_per_second()
         # Collect 4x60hz power cycles of data to average across power noise
         default_tare_samples = max(2, round(sps * ((1 / 60) * 4)))
-        self.tare_samples = config.getfloat('tare_samples',
-                                            default=default_tare_samples,
-                                            minval=2, maxval=sps)
+        self.tare_samples = config.getfloat('tare_samples', default=default_tare_samples, minval=2, maxval=sps)
         max_filter_frequency = math.floor(sps / 2.)
         hp_option = "continuous_tare_highpass"
-        highpass = config.getfloat(hp_option, minval=0.1,
-                                   below=max_filter_frequency, default=None)
+        highpass = config.getfloat(hp_option, minval=0.1, below=max_filter_frequency, default=None)
         lowpass = config.getfloat("continuous_tare_lowpass",
-                above=highpass or 0., below=max_filter_frequency, default=None)
-        notches = getfloatlist(config, "continuous_tare_notch", max_len=2,
-                above=(highpass or 0.), below=(lowpass or max_filter_frequency))
-        notch_quality = config.getfloat("continuous_tare_notch_quality",
-                                        minval=0.5, maxval=6.0, default=2.0)
-        self.continuous_trigger_force = config.getfloat(
-            'continuous_tare_trigger_force',
-            minval=1., maxval=250., default=40.)
+                                  above=highpass or 0.,
+                                  below=max_filter_frequency,
+                                  default=None)
+        notches = getfloatlist(config,
+                               "continuous_tare_notch",
+                               max_len=2,
+                               above=(highpass or 0.),
+                               below=(lowpass or max_filter_frequency))
+        notch_quality = config.getfloat("continuous_tare_notch_quality", minval=0.5, maxval=6.0, default=2.0)
+        self.continuous_trigger_force = config.getfloat('continuous_tare_trigger_force',
+                                                        minval=1.,
+                                                        maxval=250.,
+                                                        default=40.)
         if (lowpass or notches) and highpass is None:
             raise config.error("Option %s is section %s must be set to use"
-                    " continuous tare" % (hp_option, config.get_name(),))
+                               " continuous tare" % (
+                                   hp_option,
+                                   config.get_name(),
+                               ))
 
-        self._continuous_tare_filter = DigialFilter(sps, config.error, highpass,
-                                                lowpass, notches, notch_quality)
+        self._continuous_tare_filter = DigialFilter(sps, config.error, highpass, lowpass, notches, notch_quality)
         # activate/deactivate gcode
         gcode_macro = printer.load_object(config, 'gcode_macro')
         self.position_endstop = config.getfloat('z_offset')
-        self.activate_gcode = gcode_macro.load_template(config,
-                                                        'activate_gcode', '')
-        self.deactivate_gcode = gcode_macro.load_template(config,
-                                                        'deactivate_gcode', '')
+        self.activate_gcode = gcode_macro.load_template(config, 'activate_gcode', '')
+        self.deactivate_gcode = gcode_macro.load_template(config, 'deactivate_gcode', '')
         # multi probes state
         self.multi = 'OFF'
-        self.deactivate_on_each_sample = config.getboolean(
-            'deactivate_on_each_sample', True)
+        self.deactivate_on_each_sample = config.getboolean('deactivate_on_each_sample', True)
         self._home_cmd = self._query_cmd = None
         self._set_range_cmd = _config_filter_cmd = None
         # internal tare tracking
@@ -834,12 +802,10 @@ class LoadCellEndstop:
         self._config_commands()
         self._mcu.register_config_callback(self._build_config)
         printer.register_event_handler("klippy:ready", self._ready_handler)
-        printer.register_event_handler("load_cell:tare",
-                                       self._handle_load_cell_tare)
+        printer.register_event_handler("load_cell:tare", self._handle_load_cell_tare)
 
     def _config_commands(self):
-        self._mcu.add_config_cmd("config_load_cell_endstop oid=%d"
-                                 % (self._oid,))
+        self._mcu.add_config_cmd("config_load_cell_endstop oid=%d" % (self._oid, ))
         #self._mcu.add_config_cmd("load_cell_endstop_home oid=%d trsync_oid=0"
         #    " trigger_reason=0 error_reason=%i clock=0 sample_count=0"
         #    " rest_ticks=0 timeout=0" % (self._oid, self.REASON_SENSOR_ERROR)
@@ -852,8 +818,7 @@ class LoadCellEndstop:
         sos_fixed = self._continuous_tare_filter.sos_fixed_q12()
         n_section = len(sos_fixed)
         for i, section in enumerate(sos_fixed):
-            args = (self._oid, n_section, i, section[0], section[1],
-                    section[2], section[3], section[4])
+            args = (self._oid, n_section, i, section[0], section[1], section[2], section[3], section[4])
             # TODO: are both needed??
             self._mcu.add_config_cmd(cmd % args)
             #self._mcu.add_config_cmd(cmd % args, on_restart=True)
@@ -861,39 +826,36 @@ class LoadCellEndstop:
     def _build_config(self):
         # Lookup commands
         cmd_queue = self._dispatch.get_command_queue()
-        self._query_cmd = self._mcu.lookup_query_command(
-            "load_cell_endstop_query_state oid=%c",
-            "load_cell_endstop_state oid=%c homing=%c homing_triggered=%c"
-            " is_triggered=%c trigger_ticks=%u sample=%i sample_ticks=%u"
-            , oid=self._oid, cq=cmd_queue)
+        self._query_cmd = self._mcu.lookup_query_command("load_cell_endstop_query_state oid=%c",
+                                                         "load_cell_endstop_state oid=%c homing=%c homing_triggered=%c"
+                                                         " is_triggered=%c trigger_ticks=%u sample=%i sample_ticks=%u",
+                                                         oid=self._oid,
+                                                         cq=cmd_queue)
         self._set_range_cmd = self._mcu.lookup_command(
             "set_range_load_cell_endstop"
             " oid=%c safety_counts_min=%i safety_counts_max=%i"
             " filter_counts_min=%i filter_counts_max=%i"
             " trigger_counts_min=%i trigger_counts_max=%i tare_counts=%i"
-            " trigger_grams=%i round_shift=%c grams_per_count=%i"
-            , cq=cmd_queue)
+            " trigger_grams=%i round_shift=%c grams_per_count=%i",
+            cq=cmd_queue)
         self._home_cmd = self._mcu.lookup_command(
             "load_cell_endstop_home oid=%c trsync_oid=%c trigger_reason=%c"
-            " error_reason=%c clock=%u sample_count=%c rest_ticks=%u timeout=%u"
-            , cq=cmd_queue)
+            " error_reason=%c clock=%u sample_count=%c rest_ticks=%u timeout=%u",
+            cq=cmd_queue)
         self._config_filter_cmd = self._mcu.lookup_command(
             "config_filter_section_load_cell_endstop oid=%c n_sections=%c"
-            " section_idx=%c sos0=%i sos1=%i sos2=%i sos3=%i sos4=%i"
-            , cq=cmd_queue)
+            " section_idx=%c sos0=%i sos1=%i sos2=%i sos3=%i sos4=%i",
+            cq=cmd_queue)
 
     def _ready_handler(self):
         self._sensor.attach_endstop(self._oid)
 
     def get_status(self, eventtime):
-        return {
-            'endstop_tare_counts': self.tare_counts,
-            'last_trigger_time': self.last_trigger_time
-        }
+        return {'endstop_tare_counts': self.tare_counts, 'last_trigger_time': self.last_trigger_time}
 
     def _handle_load_cell_tare(self, lc):
         if lc is self._load_cell:
-            logging.info("load cell tare event: %s" % (lc.get_tare_counts(),))
+            logging.info("load cell tare event: %s" % (lc.get_tare_counts(), ))
             self.set_endstop_range(lc.get_tare_counts())
 
     def set_endstop_range(self, tare_counts):
@@ -914,19 +876,20 @@ class LoadCellEndstop:
         # the filter is restricted to no more than +/- 2^Q_12 - 1 grams (2048)
         # this cant be changed without also changing from q12 format in MCU
         safe_bits = (Q12_INT_BITS - 1)
-        filter_margin = math.floor(counts_per_gram * (2 ** safe_bits))
+        filter_margin = math.floor(counts_per_gram * (2**safe_bits))
         filter_min = max(tare_counts - filter_margin, safety_min)
         filter_max = min(tare_counts + filter_margin, safety_max)
         # truncate extra bits for sensors with a large counts_per_gram
         storage_bits = int(math.ceil(math.log(counts_per_gram, 2)))
         rounding_shift = int(max(0, storage_bits - safe_bits))
         # grams per count, in rounded units
-        grams_per_count = 1. / (counts_per_gram / (2 ** rounding_shift))
+        grams_per_count = 1. / (counts_per_gram / (2**rounding_shift))
         logging.info("Set endstop range: %s, %s, %s" % (trigger_min, trigger_max, tare_counts))
-        args = [self._oid, safety_min, safety_max, filter_min, filter_max,
-                trigger_min, trigger_max, tare_counts,
-                as_fixedQ12(self.continuous_trigger_force),
-                rounding_shift, as_fixedQ12(grams_per_count)]
+        args = [
+            self._oid, safety_min, safety_max, filter_min, filter_max, trigger_min, trigger_max, tare_counts,
+            as_fixedQ12(self.continuous_trigger_force), rounding_shift,
+            as_fixedQ12(grams_per_count)
+        ]
 
         self._set_range_cmd.send(args)
 
@@ -940,9 +903,8 @@ class LoadCellEndstop:
         collector.start_collecting(min_time=toolhead.get_last_move_time())
         tare_samples, errors = collector.collect_min(self.tare_samples)
         if errors:
-            raise self.printer.command_error(
-            "Sensor reported errors while homing: %i errors, %i overflows"
-                              % (errors[0], errors[1]))
+            raise self.printer.command_error("Sensor reported errors while homing: %i errors, %i overflows" %
+                                             (errors[0], errors[1]))
         tare_counts = np.average(np.array(tare_samples)[:, 2].astype(float))
         self.set_endstop_range(int(tare_counts))
 
@@ -965,8 +927,7 @@ class LoadCellEndstop:
     def get_steppers(self):
         return self._dispatch.get_steppers()
 
-    def home_start(self, print_time, sample_time, sample_count, rest_time,
-                   triggered=True):
+    def home_start(self, print_time, sample_time, sample_count, rest_time, triggered=True):
         # do not permit homing if the load cell is not calibrated
         if not self._load_cell.is_calibrated():
             raise self.printer.command_error("Load Cell not calibrated")
@@ -981,9 +942,11 @@ class LoadCellEndstop:
         self._helper.notify_probe_start(print_time)
         trigger_completion = self._dispatch.start(print_time)
         rest_ticks = self._mcu.seconds_to_clock(self._rest_time)
-        self._home_cmd.send([self._oid, self._dispatch.get_oid(),
-            mcu.MCU_trsync.REASON_ENDSTOP_HIT, self.REASON_SENSOR_ERROR, clock,
-            self.trigger_count, rest_ticks, WATCHDOG_MAX])
+        self._home_cmd.send([
+            self._oid,
+            self._dispatch.get_oid(), mcu.MCU_trsync.REASON_ENDSTOP_HIT, self.REASON_SENSOR_ERROR, clock,
+            self.trigger_count, rest_ticks, WATCHDOG_MAX
+        ])
         return trigger_completion
 
     def clear_home(self):
@@ -1000,8 +963,7 @@ class LoadCellEndstop:
         res = self._dispatch.stop()
         if res >= mcu.MCU_trsync.REASON_COMMS_TIMEOUT:
             if res == mcu.MCU_trsync.REASON_COMMS_TIMEOUT:
-                raise self.printer.command_error(
-                    "Communication timeout during homing")
+                raise self.printer.command_error("Communication timeout during homing")
             raise self.printer.command_error("Load cell sensor error")
         if res != mcu.MCU_trsync.REASON_ENDSTOP_HIT:
             return 0.
@@ -1025,15 +987,14 @@ class LoadCellEndstop:
         start_pos = toolhead.get_position()
         self.deactivate_gcode.run_gcode_from_command()
         if toolhead.get_position()[:3] != start_pos[:3]:
-            raise self.printer.command_error(
-                "Toolhead moved during probe deactivate_gcode script")
+            raise self.printer.command_error("Toolhead moved during probe deactivate_gcode script")
+
     def _lower_probe(self):
         toolhead = self.printer.lookup_object('toolhead')
         start_pos = toolhead.get_position()
         self.activate_gcode.run_gcode_from_command()
         if toolhead.get_position()[:3] != start_pos[:3]:
-            raise self.printer.command_error(
-                "Toolhead moved during probe activate_gcode script")
+            raise self.printer.command_error("Toolhead moved during probe activate_gcode script")
 
     # Interface for ProbeEndstopWrapper
     def probing_move(self, pos, speed):
@@ -1068,8 +1029,7 @@ class LoadCellPrinterProbe():
         self.printer = config.get_printer()
         self.mcu_probe = load_cell_endstop
         self._load_cell = load_cell_inst
-        self.cmd_helper = probe.ProbeCommandHelper(config, self,
-                                             self.mcu_probe.query_endstop)
+        self.cmd_helper = probe.ProbeCommandHelper(config, self, self.mcu_probe.query_endstop)
         self.probe_offsets = probe.ProbeOffsetsHelper(config)
         self.probe_session = LoadCellProbeSessionHelper(config, self.mcu_probe)
 
@@ -1105,5 +1065,13 @@ def load_config(config):
     lce = LoadCellEndstop(config, lc, ProbeSessionContext(config, lc))
     lc_probe = LoadCellPrinterProbe(config, lc, lce)
     #TODO: for multiple probes this cant be static value 'probe'
-    printer.add_object('probe', lc_probe)
+    if len(config.get_name().split()) > 1:
+        chipname = '_'.join(config.get_name().split()[1:])
+    else:
+        chipname = 'probe'
+    printer.add_object(chipname, lc_probe)
     return lc_probe
+
+
+def load_config_prefix(config):
+    return load_config(config)

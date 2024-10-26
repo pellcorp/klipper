@@ -614,7 +614,7 @@ class MCU:
         self._non_critical_disconnected = False
         # self.last_noncrit_recon_eventtime = None
         self.reconnect_interval = config.getfloat("reconnect_interval", 2.0) + 0.12 #add small change to not collide with other events
-
+        
         # Register handlers
         printer.load_object(config, "error_mcu")
         printer.register_event_handler("klippy:firmware_restart",
@@ -685,7 +685,7 @@ class MCU:
             def dummy_estimated_print_time(eventtime):
                 return 0.
             self.estimated_print_time = dummy_estimated_print_time
-
+            
     def handle_non_critical_disconnect(self):
         self._non_critical_disconnected = True
         self._clocksync.disconnect()
@@ -698,14 +698,14 @@ class MCU:
     def non_critical_recon_event(self, eventtime):
         self.recon_mcu()
         return eventtime + self.reconnect_interval
-
+    
     def _send_config(self, prev_crc):
         # Build config commands
         for cb in self._config_callbacks:
             cb()
         self._config_cmds.insert(0, "allocate_oids count=%d"
                                  % (self._oid_count,))
-
+        
         # Resolve pin names
         ppins = self._printer.lookup_object('pins')
         pin_resolver = ppins.get_pin_resolver(self._name)
@@ -766,13 +766,12 @@ class MCU:
             "MCU '%s' config: %s" % (self._name, " ".join(
                 ["%s=%s" % (k, v) for k, v in self.get_constants().items()]))]
         return "\n".join(log_info)
-
+    
     def recon_mcu(self):
         res = self._mcu_identify()
         if not res:
             return
         self.reset_to_initial_state()
-
         self._connect()
         self._reactor.update_timer(
             self.non_critical_recon_timer, self._reactor.NEVER
@@ -780,7 +779,7 @@ class MCU:
         self._reactor.unregister_timer(self.non_critical_recon_timer)
         self.last_noncrit_recon_eventtime = None
         logging.info("mcu: %s reconnected", self._name)
-
+        
     def reset_to_initial_state(self):
         self._oid_count = 0
         self._config_cmds = []
@@ -789,7 +788,6 @@ class MCU:
         self._reserved_move_slots = 0
         self._stepqueues = []
         self._steppersync = None
-
     def _connect(self):
         if self._non_critical_disconnected:
             self.non_critical_recon_timer = self._reactor.register_timer(
@@ -1091,3 +1089,5 @@ def get_printer_mcu(printer, name):
     if name == 'mcu':
         return printer.lookup_object(name)
     return printer.lookup_object('mcu ' + name)
+
+
