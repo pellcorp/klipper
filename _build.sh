@@ -7,7 +7,7 @@ cd $SCRIPT_DIR
 cp .config.$1 .config
 mkdir -p outfw/
 make clean
-make 
+make
 if [ "$1" = "btteddy" ]; then
     mv out/klipper.uf2 outfw/btteddy.uf2
 else
