@@ -10,6 +10,7 @@ rm -rf outfw/
 ./_build.sh mcu || exit $?
 ./_build.sh btteddy || exit $?
 
+mkdir -p fw/K1/
 rm -rf fw/K1/*.bin
 rm -rf fw/K1/*.uf2
 mv outfw/*.bin fw/K1/
