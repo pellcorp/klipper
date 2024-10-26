@@ -58,13 +58,13 @@ class HX71xBase:
         # Command Configuration
         self.query_hx71x_cmd = None
         self.config_endstop_cmd = None
-        mcu.add_config_cmd(
+        self.mcu.add_config_cmd(
             "config_hx71x oid=%d gain_channel=%d dout_pin=%s sclk_pin=%s"
             % (self.oid, self.gain_channel, self.dout_pin, self.sclk_pin))
-        mcu.add_config_cmd("query_hx71x oid=%d rest_ticks=0"
+        self.mcu.add_config_cmd("query_hx71x oid=%d rest_ticks=0"
                            % (self.oid,), on_restart=True)
 
-        mcu.register_config_callback(self._build_config)
+        self.mcu.register_config_callback(self._build_config)
 
     def _build_config(self):
         self.query_hx71x_cmd = self.mcu.lookup_command(
