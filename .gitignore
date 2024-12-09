@@ -1,5 +1,6 @@
 out
 *.pyc
+.idea
 .config
 .config.old
 klippy/.version
