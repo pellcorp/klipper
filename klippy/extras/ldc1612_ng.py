@@ -61,7 +61,9 @@ class LDC1612_ng_value:
 @dataclass
 class LDC1612_ng_homing_result:
     trigger_time: float
+    tap_start_time: float
     tap_end_time: float
+    error: int
 
 
 # Interface class to LDC1612 mcu support
@@ -70,7 +72,7 @@ class LDC1612_ng:
         self.printer: Printer = config.get_printer()
 
         self._name = config.get_name().split()[-1]
-        self._verbose = config.getboolean("verbose", True)
+        self._verbose = config.getboolean("debug", False)
 
         device_choices = {
             "ldc1612": PRODUCT_UNKNOWN,
@@ -117,7 +119,6 @@ class LDC1612_ng:
         if drive_current == 0:
             drive_current = self._default_drive_current
         self._drive_current = drive_current
-        logging.info(f"ldc dc {self._drive_current}")
 
         self._deglitch: str = config.get("ldc_deglitch", "default").lower()
         self._data_rate: int = config.getint(
@@ -269,7 +270,7 @@ class LDC1612_ng:
 
         self._ldc1612_ng_finish_home_cmd = self._mcu.lookup_query_command(
             "ldc1612_ng_finish_home oid=%c",
-            "ldc1612_ng_finish_home_reply oid=%c trigger_clock=%u tap_end_clock=%u",
+            "ldc1612_ng_finish_home_reply oid=%c trigger_clock=%u tap_start_clock=%u tap_end_clock=%u error=%u",
             oid=self._oid,
             cq=cmdqueue,
         )
@@ -338,6 +339,20 @@ class LDC1612_ng:
             if s & (1 << bit):
                 flags.append(flag)
         return " ".join(flags)
+
+    def data_error_to_str(self, d: int):
+        err_bits = [
+            "Under-range Error",
+            "Over-range Error",
+            "Watchdog Error",
+            "Amplitude Error"
+        ]
+        d = d >> 12 # shift out the data bits
+        errors = []
+        for bit, err in enumerate(err_bits):
+            if d & (1 << bit):
+                errors.append(err)
+        return " ".join(errors)
 
     def read_one_value(self):
         self._init_chip()
@@ -417,23 +432,23 @@ class LDC1612_ng:
             ]
         )
 
+    def _convert_clock(self, c):
+        if c == 0:
+            return 0
+        return self._clock32_to_print_time(c)
+
     def finish_home(self):
-        # "ldc1612_finish_home2_reply oid=%c homing=%c trigger_clock=%u tap_end_clock=%u",
+        # "ldc1612_finish_home2_reply oid=%c homing=%c trigger_clock=%u tap_start_clock=%u tap_end_clock=%u",
         reply = self._ldc1612_ng_finish_home_cmd.send([self._oid])
         trigger_clock = reply["trigger_clock"]
+        tap_start_clock = reply["tap_start_clock"]
         tap_end_clock = reply["tap_end_clock"]
-        trigger_time = (
-            self._clock32_to_print_time(trigger_clock)
-            if trigger_clock > 0
-            else 0
-        )
-        tap_end_time = (
-            self._clock32_to_print_time(tap_end_clock)
-            if tap_end_clock > 0
-            else 0
-        )
+        error = reply["error"]
+        trigger_time = self._convert_clock(trigger_clock)
+        tap_start_time = self._convert_clock(tap_start_clock)
+        tap_end_time = self._convert_clock(tap_end_clock)
 
-        return LDC1612_ng_homing_result(trigger_time, tap_end_time)
+        return LDC1612_ng_homing_result(trigger_time, tap_start_time, tap_end_time, error)
 
     def set_sos_section(self, sect_num: int, sect_vals: List[float]):
         print(sect_vals)
