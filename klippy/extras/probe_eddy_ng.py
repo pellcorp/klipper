@@ -1898,6 +1898,7 @@ class ProbeEddy:
                     # only one sample, we're done
                     tap_z = tap.probe_z
                     tap_stddev = 0.0
+                    tap_overshoot = tap.overshoot
                     break
 
                 if len(results) >= samples:
@@ -1933,7 +1934,7 @@ class ProbeEddy:
         if home_z:
             th_pos = th.get_position()
             th_pos[2] = -(tap_adjust_z + tap_overshoot)
-            homed_to_str = f"homed z={th_pos[2]:.3f}, "
+            homed_to_str = f"homed z with overshoot={th_pos[2]:.3f}, "
             self._set_toolhead_position(th_pos, [2])
             self._last_tap_gcode_adjustment = 0.0
             adjusted_tap_z = 0.0
@@ -1971,8 +1972,8 @@ class ProbeEddy:
         self._tap_offset = float(self.params.home_trigger_height - result.value)
 
         self._log_msg(
-            f"Probe {homed_to_str}computed tap at {computed_tap_z:.3f} (tap at z={tap_z:.3f}, "
-            f"stddev {tap_stddev:.3f}) with {samples} samples, "
+            f"Probe computed tap at {computed_tap_z:.3f} (tap at z={tap_z:.3f}, "
+            f"stddev {tap_stddev:.3f}) with {samples} samples, {homed_to_str}"
             f"sensor offset {self._tap_offset:.3f} at z={self.params.home_trigger_height:.3f}"
         )
 
@@ -2033,7 +2034,7 @@ class ProbeEddy:
         s_rf = s_f = np.asarray([s[1] for s in raw_samples])
         s_true_f = np.asarray([s[1] for s in samples])
         s_z = np.asarray([s[2] for s in samples])
-        s_kinz = np.asarray([self._get_trapq_position(s[0])[0][2] for s in samples])
+        s_kinz = np.asarray([(self._get_trapq_position(s[0]) or [[0,0,-10]])[0][2] for s in samples])
 
         # Any values below 0.0 are suspect because they were not calibrated,
         # and so are just extrapolated from the fit. So just don't show them.
