@@ -721,7 +721,7 @@ class MCU:
 
     def non_critical_recon_event(self, eventtime):
         # for beacon, carto (scanner) or eddy we want to bail out of trying to reconnect
-        if self._name == 'beacon' or self._name == 'scanner' or self._name == 'eddy':
+        if self._name == 'beacon' or self._name == 'scanner' or self._name == 'cartographer' or self._name == 'eddy':
             return self._reactor.NEVER
 
         success = self.recon_mcu()
