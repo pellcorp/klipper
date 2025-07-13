@@ -392,7 +392,7 @@ class ProbeEddyProbeResult:
     @property
     def stddev(self):
         stddev_sum = np.sum([(s - self.value) ** 2.0 for s in self.samples])
-        return (stddev_sum / len(self.samples)) ** 0.5
+        return float((stddev_sum / len(self.samples)) ** 0.5)
 
     @classmethod
     def make(cls, times: List[float], heights: List[float], errors: int = 0) -> ProbeEddyProbeResult:
@@ -556,7 +556,7 @@ class ProbeEddy:
 
     def _log_debug(self, msg):
         if self.params.debug:
-            logging.debug(f"{self._name}: {msg}")
+            logging.info(f"{self._name}: {msg}")
 
     def define_commands(self, gcode):
         gcode.register_command("PROBE_EDDY_NG_STATUS", self.cmd_STATUS, self.cmd_STATUS_help)
@@ -836,6 +836,8 @@ class ProbeEddy:
             height = -math.inf
             freq = 0.0
             err = f"ERROR: {bin(freqval >> 28)} "
+        elif freq <= 0.0:
+            err += "(Zero frequency) "
         elif self.calibrated():
             height = self.freq_to_height(freq)
         else:
@@ -1334,9 +1336,9 @@ class ProbeEddy:
 
         if times is None:
             if report_errors:
-                self._log_error("No samples collected. This could be a hardware issue or an incorrect drive current.")
+                self._log_error(f"Drive current {drive_current}: No samples collected. This could be a hardware issue or an incorrect drive current.")
             else:
-                self._log_warning("Warning: no samples collected.")
+                self._log_warning(f"Drive current {drive_current}: Warning: no samples collected.")
             return None, None, None
 
         # and build a map
@@ -1676,6 +1678,8 @@ class ProbeEddy:
 
                 probe_z = probe_position[2]
 
+                self._log_debug(f"tap: probe_z: {probe_z:.3f} finish_z: {finish_z:.3f} moved up to {start_z:.3f}")
+
                 if probe_z - target_z < 0.050:
                     # we detected a tap but it was too close to our target z
                     # to be trusted
@@ -1853,10 +1857,9 @@ class ProbeEddy:
         try:
             self._sensor.set_drive_current(tap_drive_current)
 
-            sample_i = 0
             sample_last_err = None
 
-            while sample_i < max_samples:
+            for sample_i in range(max_samples):
                 if self.params.debug:
                     self.save_samples_path = f"/tmp/tap-samples-{sample_i+1}.csv"
 
@@ -1867,7 +1870,6 @@ class ProbeEddy:
                     lift_speed=lift_speed,
                     tapcfg=tapcfg,
                 )
-                sample_i += 1
 
                 if write_every_tap_plot:
                     try:
@@ -1877,18 +1879,18 @@ class ProbeEddy:
 
                 if tap.error:
                     if "too close to target z" in str(tap.error):
-                        self._log_msg(f"Tap {sample_i}: failed: try lowering TARGET_Z by 0.100 (to {target_z - 0.100:.3f})")
+                        self._log_msg(f"Tap {sample_i+1}: failed: try lowering TARGET_Z by 0.100 (to {target_z - 0.100:.3f})")
                     else:
-                        self._log_msg(f"Tap {sample_i}: failed ({tap.error})")
+                        self._log_msg(f"Tap {sample_i+1}: failed ({tap.error})")
                     sample_err_count += 1
                     sample_last_err = tap
                     continue
 
                 results.append(tap)
 
-                self._log_msg(f"Tap {sample_i}: z={tap.probe_z:.3f}")
+                self._log_msg(f"Tap {sample_i+1}: z={tap.probe_z:.3f}")
                 self._log_debug(
-                    f"tap[{sample_i}]: {tap.probe_z:.3f} toolhead at: {tap.toolhead_z:.3f} overshoot: {tap.overshoot:.3f} at {tap.tap_time:.4f}s"
+                    f"tap[{sample_i+1}]: {tap.probe_z:.3f} toolhead at: {tap.toolhead_z:.3f} overshoot: {tap.overshoot:.3f} at {tap.tap_time:.4f}s"
                 )
 
                 if samples == 1:
@@ -1933,9 +1935,11 @@ class ProbeEddy:
         homed_to_str = ""
         if home_z:
             th_pos = th.get_position()
-            true_z_zero = - (tap_adjust_z + tap_overshoot)
+            th_z = th_pos[2]
+            #true_z_zero = - (tap_adjust_z + tap_overshoot)
+            true_z_zero = - computed_tap_z
             th_pos[2] = th_pos[2] + true_z_zero
-            homed_to_str = f"homed z with true_z_zero={true_z_zero:.3f}, "
+            homed_to_str = f"homed z with true_z_zero={true_z_zero:.3f}, thz={th_z:.3f}, setz={th_pos[2]:.3f}, overshoot={tap_overshoot:.3f}, "
             self._set_toolhead_position(th_pos, [2])
             self._last_tap_gcode_adjustment = 0.0
             adjusted_tap_z = 0.0
@@ -2126,7 +2130,7 @@ class ProbeEddy:
 
         fig.update_layout(
             hovermode="x unified",
-            title=dict(text=f"Tap {tapnum}: {tap.probe_z:.3f}"),
+            title=dict(text=f"Tap {tapnum+1}: {tap.probe_z:.3f}"),
             yaxis=dict(title="Z", side="right"),  # Z axis
             yaxis2=dict(overlaying="y", title="Freq", tickformat="d", side="left"),  # Freq + WMA
             yaxis3=dict(overlaying="y", side="left", tickformat="d", position=0.2),  # derivatives, tap accum
@@ -2747,16 +2751,17 @@ class ProbeEddySampler:
         interval_heights = []
         i = 0
         for iv_start, iv_end in intervals:
-            # find start time of interval
             while i < num_samples and times[i] < iv_start:
                 i += 1
-            if i == num_samples:
-                raise self._printer.command_error(f"No samples in time range {iv_start}-{iv_end}")
-
             istart = i
+
             while i < num_samples and times[i] < iv_end:
                 i += 1
-            iend = i-1
+            iend = i
+
+            if istart == iend:
+                # no samples in this range
+                raise self._printer.command_error(f"No samples in time range {iv_start}-{iv_end}")
 
             median = np.median(heights[istart:iend])
             interval_heights.append(float(median))
@@ -2921,7 +2926,7 @@ class ProbeEddyFrequencyMap:
         if len(freqs) == 0 or len(heights) == 0:
             if report_errors:
                 self._eddy._log_error(
-                    f"Error: Calibration failed, couldn't compute averages ({len(raw_freqs_list)}, {len(raw_heights_list)}), probably due to no valid samples received."
+                    f"Drive current {drive_current}: Calibration failed, couldn't compute averages ({len(raw_freqs_list)}, {len(raw_heights_list)}), probably due to no valid samples received."
                 )
             return None, None
 
@@ -2935,28 +2940,28 @@ class ProbeEddyFrequencyMap:
         if report_errors:
             if max_height < 2.5:  # we really can't do anything with this
                 self._eddy._log_error(
-                    f"Error: max height for valid samples is too low: {max_height:.3f} < 2.5. Possible causes: bad drive current, bad sensor mount height."
+                    f"Drive current {drive_current} error: max height for valid samples is too low: {max_height:.3f} < 2.5. Possible causes: bad drive current, bad sensor mount height."
                 )
                 if not self._eddy.params.allow_unsafe:
                     return None, None
 
             if min_height > 0.65:  # this is a bit arbitrary; but if it's this far off we shouldn't trust it
                 self._eddy._log_error(
-                    f"Error: min height for valid samples is too high: {min_height:.3f} > 0.65. Possible causes: bad drive current, bad sensor mount height."
+                    f"Drive current {drive_current} error: min height for valid samples is too high: {min_height:.3f} > 0.65. Possible causes: bad drive current, bad sensor mount height."
                 )
                 if not self._eddy.params.allow_unsafe:
                     return None, None
 
             if min_height > 0.025:
                 self._eddy._log_msg(
-                    f"Warning: min height is {min_height:.3f} (> 0.025) is too high for tap. This calibration will work fine for homing, but may not for tap."
+                    f"Drive current {drive_current} warning: min height is {min_height:.3f} (> 0.025) is too high for tap. This calibration will work fine for homing, but may not for tap."
                 )
 
             # somewhat arbitrary spread
             if freq_spread < 0.30:
                 extremely = "EXTREMELY " if freq_spread < 0.15 else ""
                 self._eddy._log_warning(
-                    f"Warning: frequency spread is {extremely}low ({freq_spread:.2f}%, {min_freq:.1f}-{max_freq:.1f}), which will greatly impact accuracy. Your sensor may be too high."
+                    f"Drive current {drive_current} warning: frequency spread is {extremely}low ({freq_spread:.2f}%, {min_freq:.1f}-{max_freq:.1f}), which will greatly impact accuracy. Your sensor may be too high."
                 )
 
         low_samples = heights <= ProbeEddyFrequencyMap.low_z_threshold
@@ -2986,7 +2991,7 @@ class ProbeEddyFrequencyMap:
         if report_errors:
             if rmse_fth > 0.050:
                 self._eddy._log_error(
-                    f"Error: calibration error margin is too high ({rmse_fth:.3f}). Possible causes: bad drive current, bad sensor mount height."
+                    f"Drive current {drive_current} error: calibration error margin is too high ({rmse_fth:.3f}). Possible causes: bad drive current, bad sensor mount height."
                 )
                 if not self._eddy.params.allow_unsafe:
                     return None, None
