@@ -624,6 +624,8 @@ class MCU:
             if canbus_uuid:
                 raise error("CAN MCUs can't be non-critical yet!")
         self.non_critical_disconnected = False
+        # until we actually do the connect its not connected
+        self._get_status_info['is_connected'] = False
         self._non_critical_reconnect_event_name = (
             f"danger:non_critical_mcu_{self.get_name()}:reconnected"
         )
@@ -873,9 +875,11 @@ class MCU:
 
     def _mcu_identify(self):
         if self.is_non_critical and not self._check_serial_exists():
+            self._get_status_info['is_connected'] = False
             self.non_critical_disconnected = True
             return False
         else:
+            self._get_status_info['is_connected'] = True
             self.non_critical_disconnected = False
         if self.is_fileoutput():
             self._connect_file()
@@ -1021,6 +1025,7 @@ class MCU:
     def _disconnect(self):
         self._serial.disconnect()
         self._steppersync = None
+        self._get_status_info['is_connected'] = False
     def _shutdown(self, force=False):
         if (self._emergency_stop_cmd is None
             or (self._is_shutdown and not force)):
