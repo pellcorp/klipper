@@ -47,6 +47,7 @@ class ShellCommand:
     cmd_RUN_SHELL_COMMAND_help = "Run a linux shell command"
     def cmd_RUN_SHELL_COMMAND(self, params):
         gcode_params = params.get('PARAMS','')
+        gcode_params = os.path.expandvars(gcode_params)
         gcode_params = shlex.split(gcode_params)
         reactor = self.printer.get_reactor()
         try:
