@@ -102,7 +102,7 @@ class LoadCellCommandHelper:
                     or not config.has_section("load_cell")):
                 logging.info("Registering default commands for: %s"
                              % (self.name,))
-                #self.register_commands(None)
+                self.register_commands(None)
 
     def register_commands(self, name):
         # Register commands
