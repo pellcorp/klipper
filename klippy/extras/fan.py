@@ -105,17 +105,49 @@ class PrinterFan:
     def __init__(self, config):
         self.fan = Fan(config)
         # Register commands
-        gcode = config.get_printer().lookup_object('gcode')
-        gcode.register_command("M106", self.cmd_M106)
-        gcode.register_command("M107", self.cmd_M107)
+        self.gcode = config.get_printer().lookup_object('gcode')
+        self.gcode.register_command("M106", self.cmd_M106)
+        self.gcode.register_command("M107", self.cmd_M107)
+
+        # Enable with:
+        #   [fan]
+        #   p_selector_map: chamber, auxiliary, chamber
+        self.p_selector_map = config.getlist('p_selector_map', sep=',', default=None)
+
     def get_status(self, eventtime):
         return self.fan.get_status(eventtime)
+
+    def _resolve_p_target(self, macro, pval):
+        p = str(pval).strip()
+        try:
+            idx = int(p)
+        except Exception:
+            raise self.gcode.error(f"{macro} P is not a valid index")
+
+        # index is 1 based
+        if idx < 1 or idx > len(self.p_selector_map):
+            raise self.gcode.error(f"{macro} P index out of range")
+        return self.p_selector_map[idx-1]
+
     def cmd_M106(self, gcmd):
-        # Set fan speed
+        # Set fan speed (0..255 -> 0..1)
         value = gcmd.get_float('S', 255., minval=0.) / 255.
+        if self.p_selector_map and gcmd.get('P', None) is not None:
+            target = self._resolve_p_target('M106', gcmd.get('P'))
+            self.gcode.run_script_from_command(
+                "SET_FAN_SPEED FAN=%s SPEED=%0.6f" % (target, max(0., min(1., value)))
+            )
+            return
         self.fan.set_speed_from_command(value)
+
     def cmd_M107(self, gcmd):
         # Turn fan off
+        if self.p_selector_map and gcmd.get('P', None) is not None:
+            target = self._resolve_p_target('M107', gcmd.get('P'))
+            self.gcode.run_script_from_command(
+                "SET_FAN_SPEED FAN=%s SPEED=0" % (target,)
+            )
+            return
         self.fan.set_speed_from_command(0.)
 
 def load_config(config):
