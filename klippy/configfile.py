@@ -251,6 +251,8 @@ class ConfigAutoSave:
         gcode = self.printer.lookup_object('gcode')
         gcode.register_command("SAVE_CONFIG", self.cmd_SAVE_CONFIG,
                                desc=self.cmd_SAVE_CONFIG_help)
+        gcode.register_command("CLEAR_SAVE_CONFIG", self.cmd_CLEAR_SAVE_CONFIG,
+                               desc=self.cmd_CLEAR_SAVE_CONFIG_help)
     def _find_autosave_data(self, data):
         regular_data = data
         autosave_data = ""
@@ -407,6 +409,22 @@ class ConfigAutoSave:
         # Request a restart
         gcode = self.printer.lookup_object('gcode')
         gcode.request_restart('restart')
+
+    cmd_CLEAR_SAVE_CONFIG_help = "Clear pending config file changes and not restart"
+    def cmd_CLEAR_SAVE_CONFIG(self, gcmd):
+        if not self.fileconfig.sections():
+            return
+
+        filename = self.printer.get_start_args()['config_file']
+        cfgrdr = ConfigFileReader()
+        data = cfgrdr.read_config_file(filename)
+
+        regular_data, autosave_data = self._find_autosave_data(data)
+        self.fileconfig = cfgrdr.build_fileconfig(autosave_data, filename)
+
+        # 3. Clear pending flags so Moonraker/UI drop the button
+        self.status_save_pending.clear()
+        self.save_config_pending = False
 
 
 ######################################################################
