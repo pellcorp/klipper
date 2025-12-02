@@ -716,17 +716,25 @@ class MCU:
         self.gcode.respond_info(f"mcu: '{self._name}' disconnected!", log=True)
 
     def non_critical_recon_event(self, eventtime):
-        # for beacon, carto (scanner) or eddy we want to bail out of trying to reconnect
-        if self._name == 'beacon' or self._name == 'scanner' or self._name == 'cartographer' or self._name == 'eddy':
-            return self._reactor.NEVER
+        # Attempt to reconnect the non-critical MCU; keep retrying until it succeeds.
+        # We removed hard-coded exclusions (beacon/scanner/cartographer/eddy)
+        # so any non-critical mcu will be attempted.
+        success = False
+        try:
+            success = self.recon_mcu()
+        except Exception as e:
+            # Be defensive: log and fall through to schedule retry
+            logging.info("Non-critical MCU '%s' recon attempt failed: %s",
+                         self.get_name(), str(e))
 
-        success = self.recon_mcu()
         if success:
+            # Announce and stop retrying
             self.gcode.respond_info(
-                f"mcu: '{self._name}' reconnected!", log=True
+                f"mcu: '{self.get_name()}' reconnected!", log=True
             )
             return self._reactor.NEVER
         else:
+            # Keep retrying after reconnect_interval
             return eventtime + self.reconnect_interval
 
     def _send_config(self, prev_crc):
@@ -804,14 +812,30 @@ class MCU:
         return "\n".join(log_info)
 
     def recon_mcu(self):
-        res = self._mcu_identify()
+        # Attempt identify first (will return False if serial not present)
+        try:
+            res = self._mcu_identify()
+        except Exception as e:
+            logging.info("recon_mcu: identify failed for '%s': %s",
+                         self.get_name(), str(e))
+            res = False
+
         if not res:
             return False
-        self.reset_to_initial_state()
-        self.non_critical_disconnected = False
-        self._connect()
-        self._printer.send_event(self._non_critical_reconnect_event_name)
-        return True
+
+        # Treat the reattached MCU as a fresh device: reset state and reconnect
+        try:
+            self.reset_to_initial_state()
+            self.non_critical_disconnected = False
+            self._connect()
+            self._printer.send_event(self._non_critical_reconnect_event_name)
+            return True
+        except Exception as e:
+            logging.info("recon_mcu: connect/config failed for '%s': %s",
+                         self.get_name(), str(e))
+            # If config failed, mark as disconnected so the recon timer will retry
+            self.non_critical_disconnected = True
+            return False
 
     def reset_to_initial_state(self):
         if self._cached_init_state:
@@ -829,7 +853,35 @@ class MCU:
                 self._reactor.NOW + self.reconnect_interval,
             )
             return
-        config_params = self._send_get_config()
+
+        # Try to get config from MCU; if this fails for a non-critical MCU,
+        # don't raise — schedule reconnect attempts instead.
+        try:
+            config_params = self._send_get_config()
+        except error as e:
+            # If this MCU is non-critical, mark as disconnected and schedule retry
+            if self.is_non_critical:
+                logging.info("Non-critical MCU '%s' not ready: %s - will retry",
+                             self._name, str(e))
+                self.non_critical_disconnected = True
+                # trigger reconnection attempts
+                self._reactor.update_timer(
+                    self.non_critical_recon_timer,
+                    self._reactor.NOW + self.reconnect_interval,
+                )
+                # Inform the user via gcode (will also appear in log)
+                try:
+                    self.gcode.respond_info(
+                        f"mcu: '{self._name}' not initialized -- will retry connection",
+                        log=True
+                    )
+                except Exception:
+                    # avoid breaking if gcode isn't available for some reason
+                    pass
+                return
+            # Non non-critical MCU: re-raise so existing logic handles it (abort/init)
+            raise
+
         if not config_params['is_config']:
             if self._restart_method == 'rpi_usb':
                 # Only configure mcu after usb power reset
@@ -838,6 +890,23 @@ class MCU:
             self._send_config(None)
             config_params = self._send_get_config()
             if not config_params['is_config'] and not self.is_fileoutput():
+                # If it's non-critical, schedule retry rather than raising
+                if self.is_non_critical:
+                    logging.info("Non-critical MCU '%s' failed to be configured; will retry",
+                                 self._name)
+                    self.non_critical_disconnected = True
+                    self._reactor.update_timer(
+                        self.non_critical_recon_timer,
+                        self._reactor.NOW + self.reconnect_interval,
+                    )
+                    try:
+                        self.gcode.respond_info(
+                            f"mcu: '{self._name}' configuration failed -- will retry",
+                            log=True,
+                        )
+                    except Exception:
+                        pass
+                    return
                 raise error("Unable to configure MCU '%s'" % (self._name,))
         else:
             start_reason = self._printer.get_start_args().get("start_reason")
@@ -846,6 +915,7 @@ class MCU:
                             % (self._name,))
             # Already configured - send init commands
             self._send_config(config_params['crc'])
+
         # Setup steppersync with the move_count returned by get_config
         move_count = config_params['move_count']
         if move_count < self._reserved_move_slots:
