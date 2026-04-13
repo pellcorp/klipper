@@ -51,6 +51,8 @@ class PrinterTemperatureMCU:
         self.max_temp = max_temp
     # Internal code
     def adc_callback(self, read_time, read_value):
+        if self.base_temperature is None or self.slope is None:
+            return
         temp = self.base_temperature + read_value * self.slope
         self.temperature_callback(read_time + SAMPLE_COUNT * SAMPLE_TIME, temp)
     def calc_temp(self, adc):
@@ -65,8 +67,18 @@ class PrinterTemperatureMCU:
     def _build_config(self):
         # Obtain mcu information
         mcu = self.mcu_adc.get_mcu()
-        self.debug_read_cmd = mcu.lookup_query_command(
-            "debug_read order=%c addr=%u", "debug_result val=%u")
+        try:
+            self.debug_read_cmd = mcu.lookup_query_command(
+                "debug_read order=%c addr=%u", "debug_result val=%u")
+        except Exception:
+            if not getattr(mcu, 'is_non_critical', False):
+                raise
+            logging.warning(
+                "temperature_mcu: MCU '%s' does not support 'debug_read'"
+                " command, skipping MCU temperature configuration",
+                mcu.get_name())
+            self.mcu_adc.setup_adc_sample(SAMPLE_TIME, SAMPLE_COUNT)
+            return
         self.mcu_type = mcu.get_constants().get("MCU", "")
         # Run MCU specific configuration
         cfg_funcs = [
