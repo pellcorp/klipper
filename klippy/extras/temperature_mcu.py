@@ -65,8 +65,13 @@ class PrinterTemperatureMCU:
     def _build_config(self):
         # Obtain mcu information
         mcu = self.mcu_adc.get_mcu()
-        self.debug_read_cmd = mcu.lookup_query_command(
-            "debug_read order=%c addr=%u", "debug_result val=%u")
+        try:
+            self.debug_read_cmd = mcu.lookup_query_command(
+                "debug_read order=%c addr=%u", "debug_result val=%u")
+        except Exception:
+            if not getattr(mcu, 'is_non_critical', False):
+                raise
+            return
         self.mcu_type = mcu.get_constants().get("MCU", "")
         # Run MCU specific configuration
         cfg_funcs = [
