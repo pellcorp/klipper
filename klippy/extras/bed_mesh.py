@@ -646,6 +646,11 @@ class BedMeshCalibrate:
         if not self._profile_name.strip():
             raise gcmd.error("Value for parameter 'PROFILE' must be specified")
         self.bedmesh.set_mesh(None)
+
+        # make it possible to not generate a save event for a full bed mesh
+        if gcmd.get_int('SKIP_SAVE', 0):
+            self._profile_name = None
+
         try:
             self.update_config(gcmd)
         except BedMeshError as e:
