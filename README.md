@@ -1,17 +1,20 @@
-Welcome to the Klipper project!
+# Simple AF Klipper fork for K1 Series (MIPS)
 
-[![Klipper](docs/img/klipper-logo-small.png)](https://www.klipper3d.org/)
+This includes K1, K1C, K1 Max, K1SE as well as Ender 3 V3 KE, Ender 5 Max and Nebula Pad
 
-https://www.klipper3d.org/
+## Building firmware
 
-The Klipper firmware controls 3d-Printers. It combines the power of a
-general purpose computer with one or more micro-controllers. See the
-[features document](https://www.klipper3d.org/Features.html) for more
-information on why you should use the Klipper software.
+The host, btteddy and Nebula Pad specific firmware for older ender 3s is done here via docker
 
-Start by [installing Klipper software](https://www.klipper3d.org/Installation.html).
+```
+docker run -ti -v $PWD:$PWD pellcorp/k1-klipper-fw-build $PWD/build.sh
+```
 
-Klipper software is Free Software. See the [license](COPYING) or read
-the [documentation](https://www.klipper3d.org/Overview.html). We
-depend on the generous support from our
-[sponsors](https://www.klipper3d.org/Sponsors.html).
+## Building Chelper
+
+The MIPS Creality OS does not have gcc so we need to prebuild c_helper.so
+
+```
+cd klippy/chelper
+docker run -ti -v $PWD:$PWD pellcorp/k1-klipper-fw-build /bin/bash -c "cd $PWD && make clean && make"
+```

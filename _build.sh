@@ -12,10 +12,11 @@ cp .config.$1 .config
 mkdir -p outfw/
 make clean
 make
+
 if [ "$1" = "host" ]; then
-  mv out/klipper.elf fw/K1/klipper_host_mcu
+  mv out/klipper.elf outfw/klipper_host_mcu
 elif [ "$1" = "btteddy" ]; then
-  mv out/klipper.uf2 fw/K1/btteddy.uf2
+  mv out/klipper.uf2 outfw/btteddy.uf2
 else
-  echo "$1 not supported"
+  mv out/klipper.bin outfw/${1}.bin
 fi
