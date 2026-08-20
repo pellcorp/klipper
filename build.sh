@@ -8,6 +8,7 @@ cd $SCRIPT_DIR
 ./_build.sh host || exit $?
 ./_build.sh creality-42x || exit $?
 ./_build.sh e3v3se || exit $?
+./_build.sh e3v3se_c14 || exit $?
 
 mv outfw/klipper_host_mcu fw/K1/
 mv outfw/btteddy.uf2 fw/K1/

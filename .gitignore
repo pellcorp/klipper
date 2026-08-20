@@ -3,6 +3,7 @@ out
 #*.so
 *.pyc
 .config
+outfw/
 .idea/
 .config.old
 klippy/.version
